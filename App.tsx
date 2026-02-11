@@ -56,6 +56,7 @@ export default function App() {
     }
     return {
       ...dbOrder,
+      createdAt: Number(dbOrder.created_at), // Mapeamento correto de snake_case para camelCase
       tableNumber: dbOrder.table_number,
       customerName: dbOrder.customer_name,
       customerPhone: dbOrder.customer_phone,
@@ -115,7 +116,7 @@ export default function App() {
         const [pRes, cRes, oRes, sRes] = await Promise.all([
           supabase.from('products').select('*').order('name'),
           supabase.from('categories').select('*').order('name'),
-          supabase.from('orders').select('*').order('createdAt', { ascending: false }),
+          supabase.from('orders').select('*').order('created_at', { ascending: false }), // Usando nome da coluna do banco
           supabase.from('settings').select('data').eq('id', 'store').maybeSingle()
         ]);
 
@@ -199,13 +200,14 @@ export default function App() {
   };
 
   const addOrder = async (order: Order) => {
+    // Preparando payload com nomes de colunas snake_case para o Supabase
     const dbPayload: any = {
       id: order.id,
       type: order.type,
       items: order.items,
       status: order.status,
       total: order.total,
-      createdAt: order.createdAt,
+      created_at: order.createdAt, // Mapeamento correto de camelCase para snake_case
     };
 
     let finalNotes = order.notes || '';
