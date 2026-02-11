@@ -48,6 +48,12 @@ export default function App() {
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [isWaitstaff, setIsWaitstaff] = useState(() => !!localStorage.getItem('vovo-guta-waitstaff'));
 
+  // Aplicação imediata das cores no root
+  const applyColors = (s: StoreSettings) => {
+    document.documentElement.style.setProperty('--primary-color', s.primaryColor || '#001F3F');
+    document.documentElement.style.setProperty('--secondary-color', s.secondaryColor || '#FFD700');
+  };
+
   const mapOrderFromDb = (dbOrder: any): Order => {
     let changeForValue = dbOrder.change_for;
     if (!changeForValue && dbOrder.notes) {
@@ -56,7 +62,7 @@ export default function App() {
     }
     return {
       ...dbOrder,
-      createdAt: Number(dbOrder.created_at), // Mapeamento correto de snake_case para camelCase
+      createdAt: Number(dbOrder.created_at),
       tableNumber: dbOrder.table_number,
       customerName: dbOrder.customer_name,
       customerPhone: dbOrder.customer_phone,
@@ -91,13 +97,6 @@ export default function App() {
     is_by_weight: p.isByWeight
   });
 
-  useEffect(() => {
-    if (!settingsLoading) {
-      document.documentElement.style.setProperty('--primary-color', settings.primaryColor || '#3d251e');
-      document.documentElement.style.setProperty('--secondary-color', settings.secondaryColor || '#f68c3e');
-    }
-  }, [settings.primaryColor, settings.secondaryColor, settingsLoading]);
-
   const playSound = (url: string) => {
     try {
       const audio = new Audio(url);
@@ -116,18 +115,26 @@ export default function App() {
         const [pRes, cRes, oRes, sRes] = await Promise.all([
           supabase.from('products').select('*').order('name'),
           supabase.from('categories').select('*').order('name'),
-          supabase.from('orders').select('*').order('created_at', { ascending: false }), // Usando nome da coluna do banco
+          supabase.from('orders').select('*').order('created_at', { ascending: false }),
           supabase.from('settings').select('data').eq('id', 'store').maybeSingle()
         ]);
 
         if (pRes.data) setProducts(pRes.data.map(mapProductFromDb));
         if (cRes.data) setCategories(cRes.data.map((c: any) => c.name));
         if (oRes.data) setOrders(oRes.data.map(mapOrderFromDb));
-        if (sRes.data && sRes.data.data) setSettings(sRes.data.data);
+        
+        if (sRes.data && sRes.data.data) {
+          const loadedSettings = sRes.data.data;
+          setSettings(loadedSettings);
+          applyColors(loadedSettings); // Aplica antes de terminar o loading
+        } else {
+          applyColors(INITIAL_SETTINGS);
+        }
       } catch (err) {
         console.error('Erro inicial:', err);
       } finally {
-        setSettingsLoading(false);
+        // Pequeno delay para garantir que o CSS foi processado pelo browser
+        setTimeout(() => setSettingsLoading(false), 300);
       }
     };
 
@@ -178,7 +185,10 @@ export default function App() {
         fetchProducts();
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, (payload) => {
-        if (payload.new && payload.new.data) setSettings(payload.new.data);
+        if (payload.new && payload.new.data) {
+          setSettings(payload.new.data);
+          applyColors(payload.new.data);
+        }
       })
       .subscribe();
 
@@ -193,6 +203,7 @@ export default function App() {
       const { error } = await supabase.from('settings').upsert({ id: 'store', data: newSettings });
       if (error) throw error;
       setSettings(newSettings);
+      applyColors(newSettings);
     } catch (err) {
       console.error('Erro ao atualizar:', err);
       throw err;
@@ -200,14 +211,13 @@ export default function App() {
   };
 
   const addOrder = async (order: Order) => {
-    // Preparando payload com nomes de colunas snake_case para o Supabase
     const dbPayload: any = {
       id: order.id,
       type: order.type,
       items: order.items,
       status: order.status,
       total: order.total,
-      created_at: order.createdAt, // Mapeamento correto de camelCase para snake_case
+      created_at: order.createdAt,
     };
 
     let finalNotes = order.notes || '';
@@ -250,6 +260,21 @@ export default function App() {
     setActiveTable(null);
     window.location.hash = '/garconete';
   };
+
+  // Tela de carregamento para evitar flicker de cores
+  if (settingsLoading || authLoading) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center space-y-4">
+        <div className="relative">
+          <Loader2 className="animate-spin text-zinc-200" size={64} strokeWidth={1} />
+          <div className="absolute inset-0 flex items-center justify-center">
+             <Utensils className="text-zinc-400 animate-pulse" size={24} />
+          </div>
+        </div>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400 animate-pulse">Carregando Sistema...</p>
+      </div>
+    );
+  }
 
   return (
     <HashRouter>
