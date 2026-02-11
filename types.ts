@@ -67,6 +67,7 @@ export interface StoreSettings {
   couponName?: string;
   couponDiscount?: number;
   isCouponActive?: boolean;
+  isCouponForAllProducts?: boolean;
   applicableProductIds?: string[];
 }
 

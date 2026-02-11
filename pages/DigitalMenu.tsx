@@ -132,18 +132,13 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
   const confirmWeightAddition = () => {
     if (!weightProduct || !selectedWeightGrams) return;
-    
-    // Suporte a vírgula para mobile
     const grams = parseFloat(selectedWeightGrams.replace(',', '.'));
-    
     if (isNaN(grams) || grams <= 0) {
       alert("Por favor, informe um peso válido em gramas.");
       return;
     }
-
     const quantityKg = grams / 1000;
     const productToAdd = { ...weightProduct };
-
     setCart(prev => {
       const existingIndex = prev.findIndex(item => item.productId === productToAdd.id);
       if (existingIndex > -1) {
@@ -163,7 +158,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         isByWeight: true
       }];
     });
-
     setWeightProduct(null);
     setSelectedWeightGrams("");
   };
@@ -198,10 +192,12 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     const sub = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     let disc = 0;
     if (appliedCoupon) {
-      const eligibleIds = settings.applicableProductIds || [];
-      if (eligibleIds.length === 0) {
+      // Se for para toda a loja ou se não houver IDs selecionados
+      if (settings.isCouponForAllProducts !== false) {
         disc = sub * (appliedCoupon.discount / 100);
       } else {
+        // Se for para produtos específicos
+        const eligibleIds = settings.applicableProductIds || [];
         const eligibleSubtotal = cart.reduce((acc, item) => {
            return eligibleIds.includes(item.productId) ? acc + (item.price * item.quantity) : acc;
         }, 0);
@@ -352,7 +348,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       </header>
 
       <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-5 flex-1 pb-24 text-zinc-900 overflow-x-hidden w-full box-border">
-        {/* Fechar Loja Overlay */}
         {isStoreClosed && !isWaitstaff && (
           <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-center gap-3 animate-pulse">
             <AlertTriangle className="text-red-500 shrink-0" size={20} />
@@ -360,13 +355,11 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
           </div>
         )}
 
-        {/* Busca */}
         <div className="relative group w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input type="text" placeholder="O que deseja comer hoje?" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white rounded-2xl outline-none shadow-sm border border-gray-100 focus:ring-2 focus:ring-secondary/20 transition-all text-sm" />
         </div>
 
-        {/* Promoção do Dia */}
         {!searchTerm && featuredProduct && activeCategory === 'Todos' && (
           <section className="animate-fade-in w-full">
              <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-3 sm:p-4 shadow-xl border border-orange-100 flex flex-row gap-3 sm:gap-4 relative overflow-hidden group">
@@ -402,14 +395,12 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
           </section>
         )}
 
-        {/* Categorias */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 -mx-3 sm:-mx-4 px-3 sm:px-4 w-full">
             {categories.map(cat => (
               <button key={cat} onClick={() => { setActiveCategory(cat); setSearchTerm(''); }} className={`px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl whitespace-nowrap font-bold text-[10px] sm:text-[11px] border transition-all ${activeCategory === cat ? (isWaitstaff ? 'bg-secondary text-white border-secondary shadow-sm' : 'bg-primary text-white border-primary shadow-sm') : 'bg-white text-gray-400 border-gray-100'}`}>{cat}</button>
             ))}
         </div>
 
-        {/* Lista de Produtos */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
           {filteredProducts.map(product => (
             <div key={product.id} className={`bg-white rounded-2xl p-2.5 sm:p-3 shadow-sm flex gap-2.5 sm:gap-3 items-center border border-gray-50 transition-all w-full box-border ${!product.isActive ? 'opacity-50 grayscale' : ''}`}>
@@ -440,7 +431,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       </main>
 
-      {/* Modal de Informações da Loja */}
       {isInfoOpen && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl animate-scale-up">
@@ -485,7 +475,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       )}
 
-      {/* Modal de Peso */}
       {weightProduct && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-[300px] rounded-[2rem] p-6 shadow-2xl animate-scale-up space-y-5">
@@ -531,7 +520,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       )}
 
-      {/* Sacola Bottom-Sheet */}
       {isCartOpen && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center">
           <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-slide-up">
@@ -668,12 +656,10 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
             {checkoutStep !== 'success' && (
               <div className="px-5 py-6 bg-white border-t text-zinc-900 shrink-0 shadow-[0_-15px_40px_rgba(0,0,0,0.08)]">
                 <div className="space-y-3 mb-5 px-1">
-                    {appliedCoupon && (
-                      <div className="flex justify-between items-center text-xs font-bold text-green-600">
-                        <span>Subtotal:</span>
-                        <span>R$ {subtotal.toFixed(2)}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between items-center text-xs font-bold text-zinc-400">
+                      <span>Subtotal:</span>
+                      <span>R$ {subtotal.toFixed(2)}</span>
+                    </div>
                     {appliedCoupon && (
                       <div className="flex justify-between items-center text-xs font-bold text-green-600">
                         <span>Desconto ({appliedCoupon.code}):</span>

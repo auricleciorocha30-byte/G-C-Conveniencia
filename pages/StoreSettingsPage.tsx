@@ -26,7 +26,8 @@ import {
   Download,
   Upload,
   AlertTriangle,
-  Power
+  Power,
+  Layers
 } from 'lucide-react';
 
 interface Props {
@@ -106,7 +107,6 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave }) => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      // Nome do arquivo alterado para DevARO conforme pedido
       link.download = `DevARO_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(link);
       link.click();
@@ -314,6 +314,57 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave }) => {
                     <input type="number" placeholder="10" value={localSettings.couponDiscount || ''} onChange={(e) => setLocalSettings({...localSettings, couponDiscount: Number(e.target.value)})} className="w-full pl-4 pr-12 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold" />
                   </div>
                 </div>
+              </div>
+
+              <div className="pt-4 space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                      <div className="flex items-center gap-3">
+                          <Layers className="text-orange-600" size={20} />
+                          <span className="text-sm font-bold text-orange-900">Aplicar em todos os produtos</span>
+                      </div>
+                      <Switch checked={localSettings.isCouponForAllProducts ?? true} onChange={(v) => setLocalSettings({...localSettings, isCouponForAllProducts: v})} />
+                  </div>
+
+                  {!localSettings.isCouponForAllProducts && (
+                      <div className="space-y-4 animate-scale-up">
+                          <div className="relative">
+                              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                              <input 
+                                  type="text" 
+                                  placeholder="Buscar produtos para o cupom..." 
+                                  value={productSearch}
+                                  onChange={(e) => setProductSearch(e.target.value)}
+                                  className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none" 
+                              />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                              {filteredProducts.map(product => {
+                                  const isSelected = localSettings.applicableProductIds?.includes(product.id);
+                                  return (
+                                      <button 
+                                          key={product.id}
+                                          onClick={() => toggleProductSelection(product.id)}
+                                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${isSelected ? 'border-orange-500 bg-orange-50' : 'border-gray-100 bg-white hover:border-gray-200'}`}
+                                      >
+                                          <div className="relative">
+                                            <img src={product.imageUrl} className="w-10 h-10 rounded-lg object-cover" />
+                                            {isSelected && (
+                                                <div className="absolute -top-1 -right-1 bg-orange-500 text-white p-0.5 rounded-full shadow-sm">
+                                                    <Check size={10} />
+                                                </div>
+                                            )}
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                              <p className="text-xs font-bold text-gray-800 truncate">{product.name}</p>
+                                              <p className="text-[10px] text-gray-400">{product.category}</p>
+                                          </div>
+                                      </button>
+                                  );
+                              })}
+                          </div>
+                      </div>
+                  )}
               </div>
             </div>
           </section>

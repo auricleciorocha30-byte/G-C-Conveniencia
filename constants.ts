@@ -25,6 +25,7 @@ export const INITIAL_SETTINGS: StoreSettings = {
   couponName: 'BEMVINDO',
   couponDiscount: 10,
   isCouponActive: false,
+  isCouponForAllProducts: true,
   applicableProductIds: []
 };
 
