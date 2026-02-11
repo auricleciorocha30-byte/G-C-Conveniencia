@@ -47,7 +47,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
         setEditingProduct(null);
     } catch (err: any) {
         console.error('Falha ao salvar:', err);
-        alert(`Erro ao salvar: ${err.message}. Certifique-se que a coluna 'isByWeight' foi criada no SQL do Supabase.`);
+        alert(`Erro ao salvar: ${err.message || 'Verifique sua conexão e tente novamente.'}`);
     } finally {
         setIsSaving(false);
     }

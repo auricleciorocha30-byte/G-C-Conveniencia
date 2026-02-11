@@ -66,6 +66,30 @@ export default function App() {
     };
   };
 
+  const mapProductFromDb = (p: any): Product => ({
+    id: p.id,
+    name: p.name,
+    description: p.description || '',
+    price: Number(p.price),
+    category: p.category,
+    imageUrl: p.image_url || '',
+    isActive: p.is_active ?? true,
+    featuredDay: p.featured_day,
+    isByWeight: p.is_by_weight ?? false
+  });
+
+  const mapProductToDb = (p: Product) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price: p.price,
+    category: p.category,
+    image_url: p.imageUrl,
+    is_active: p.isActive,
+    featured_day: p.featuredDay,
+    is_by_weight: p.isByWeight
+  });
+
   useEffect(() => {
     if (!settingsLoading) {
       document.documentElement.style.setProperty('--primary-color', settings.primaryColor || '#3d251e');
@@ -80,6 +104,11 @@ export default function App() {
     } catch (e) {}
   };
 
+  const fetchProducts = async () => {
+    const { data } = await supabase.from('products').select('*').order('name');
+    if (data) setProducts(data.map(mapProductFromDb));
+  };
+
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
@@ -90,7 +119,7 @@ export default function App() {
           supabase.from('settings').select('data').eq('id', 'store').maybeSingle()
         ]);
 
-        if (pRes.data) setProducts(pRes.data);
+        if (pRes.data) setProducts(pRes.data.map(mapProductFromDb));
         if (cRes.data) setCategories(cRes.data.map((c: any) => c.name));
         if (oRes.data) setOrders(oRes.data.map(mapOrderFromDb));
         if (sRes.data && sRes.data.data) setSettings(sRes.data.data);
@@ -145,7 +174,7 @@ export default function App() {
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-        supabase.from('products').select('*').then(({ data }) => data && setProducts(data));
+        fetchProducts();
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, (payload) => {
         if (payload.new && payload.new.data) setSettings(payload.new.data);
@@ -220,15 +249,6 @@ export default function App() {
     window.location.hash = '/garconete';
   };
 
-  if (authLoading || settingsLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-orange-50/20 space-y-4">
-        <Loader2 className="animate-spin text-secondary" size={48} />
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Autenticando via Cloud...</p>
-      </div>
-    );
-  }
-
   return (
     <HashRouter>
       <Routes>
@@ -236,7 +256,11 @@ export default function App() {
         
         <Route path="/" element={adminUser ? <AdminLayout settings={settings} onLogout={handleLogoutAdmin} /> : <Navigate to="/login" />}>
           <Route index element={<AdminDashboard orders={orders} products={products} settings={settings} />} />
-          <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={async (p) => { await supabase.from('products').upsert(p); }} deleteProduct={async (id) => { await supabase.from('products').delete().eq('id', id); }} categories={categories} setCategories={setCategories} />} />
+          <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={async (p) => { 
+            const dbProduct = mapProductToDb(p);
+            const { error } = await supabase.from('products').upsert(dbProduct); 
+            if (error) throw error;
+          }} deleteProduct={async (id) => { await supabase.from('products').delete().eq('id', id); }} categories={categories} setCategories={setCategories} />} />
           <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} />} />
           <Route path="equipe" element={<WaitstaffManagement settings={settings} onUpdateSettings={handleUpdateSettings} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} />} />
