@@ -25,7 +25,8 @@ import {
   Power,
   Info,
   Phone,
-  Navigation
+  Navigation,
+  ArrowRight
 } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff } from '../types';
 
@@ -63,13 +64,19 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   
   const isStoreClosed = settings.isStoreOpen === false;
 
-  const [hasSelectedMode, setHasSelectedMode] = useState(isWaitstaff || !!effectiveTable || !!urlType);
+  // Gerenciamento da Seleção de Modalidade (Abertura Dinâmica)
+  const [hasSelectedMode, setHasSelectedMode] = useState(() => {
+    if (isWaitstaff) return true;
+    if (effectiveTable && settings.isTableOrderActive) return true;
+    if (urlType && ['BALCAO', 'ENTREGA', 'MESA'].includes(urlType)) return true;
+    return false;
+  });
   
   const [orderType, setOrderType] = useState<OrderType>(() => {
     if (urlType === 'BALCAO' && settings.isCounterPickupActive) return 'BALCAO';
     if (urlType === 'ENTREGA' && settings.isDeliveryActive) return 'ENTREGA';
     if (effectiveTable && settings.isTableOrderActive) return 'MESA';
-    return isWaitstaff ? 'MESA' : (settings.isTableOrderActive ? 'MESA' : settings.isCounterPickupActive ? 'BALCAO' : 'ENTREGA');
+    return isWaitstaff ? 'MESA' : 'BALCAO';
   });
 
   const [manualTable, setManualTable] = useState(effectiveTable || '');
@@ -192,11 +199,9 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     const sub = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     let disc = 0;
     if (appliedCoupon) {
-      // Se for para toda a loja ou se não houver IDs selecionados
       if (settings.isCouponForAllProducts !== false) {
         disc = sub * (appliedCoupon.discount / 100);
       } else {
-        // Se for para produtos específicos
         const eligibleIds = settings.applicableProductIds || [];
         const eligibleSubtotal = cart.reduce((acc, item) => {
            return eligibleIds.includes(item.productId) ? acc + (item.price * item.quantity) : acc;
@@ -263,57 +268,82 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     window.open(`https://wa.me/${number}`, '_blank');
   };
 
+  const selectMode = (type: OrderType) => {
+    setOrderType(type);
+    setHasSelectedMode(true);
+  };
+
+  // TELA DE ABERTURA DINÂMICA
   if (!hasSelectedMode && !isWaitstaff) {
     return (
       <div className="min-h-screen bg-primary flex items-center justify-center p-6 text-zinc-900">
-        <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-8 border border-orange-100 animate-scale-up">
-          <div className="text-center">
-            <img src={settings.logoUrl} className="w-20 h-20 rounded-full mx-auto border-4 border-orange-100 object-cover shadow-lg mb-4" alt="Logo" />
-            <h1 className="text-xl font-brand font-bold text-primary leading-tight">Boas-vindas!</h1>
-            <p className="text-[11px] text-gray-400 mt-1 uppercase tracking-widest font-black">
-              {isStoreClosed ? 'LOJA FECHADA NO MOMENTO' : 'Selecione uma modalidade'}
+        <div className="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl space-y-10 border border-orange-100 animate-scale-up relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-secondary opacity-10 rounded-full blur-3xl"></div>
+          
+          <div className="text-center relative z-10">
+            <div className="relative inline-block mb-6">
+                <img src={settings.logoUrl} className="w-24 h-24 rounded-full border-4 border-orange-50 object-cover shadow-2xl" alt="Logo" />
+                {!isStoreClosed && (
+                    <div className="absolute -bottom-1 -right-1 bg-green-500 w-6 h-6 rounded-full border-4 border-white"></div>
+                )}
+            </div>
+            <h1 className="text-2xl font-brand font-bold text-primary leading-tight">Olá! Seja bem-vindo.</h1>
+            <p className="text-xs text-gray-400 mt-2 uppercase tracking-[0.2em] font-black">
+              {isStoreClosed ? 'ESTAMOS FECHADOS NO MOMENTO' : 'Como deseja fazer seu pedido?'}
             </p>
           </div>
           
           {isStoreClosed ? (
-            <div className="bg-red-50 p-6 rounded-3xl border border-red-100 text-center space-y-4">
-               <Power size={48} className="text-red-400 mx-auto" />
-               <p className="text-xs font-bold text-red-700 uppercase leading-relaxed">
-                  Desculpe, não estamos aceitando pedidos digitais no momento. 
-                  Por favor, tente mais tarde!
+            <div className="bg-red-50 p-8 rounded-[2rem] border border-red-100 text-center space-y-4">
+               <Power size={56} className="text-red-300 mx-auto" strokeWidth={1.5} />
+               <p className="text-sm font-bold text-red-700 leading-relaxed uppercase">
+                  Nossa loja física e digital estão pausadas agora. Voltaremos em breve!
                </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-4">
                 {settings.isTableOrderActive && (
-                  <button onClick={() => { setOrderType('MESA'); setHasSelectedMode(true); }} className="flex items-center gap-4 p-4 bg-orange-50 hover:bg-orange-100 rounded-3xl transition-all border border-orange-200 group text-left">
-                      <div className="p-3 bg-white rounded-2xl text-orange-600 shadow-sm"><Utensils size={24} /></div>
-                      <div>
-                        <p className="font-bold text-base text-primary leading-none">Mesa</p>
-                        <p className="text-[10px] text-orange-700 opacity-60 font-bold uppercase mt-1">Estou no salão</p>
+                  <button onClick={() => selectMode('MESA')} className="group flex items-center justify-between p-5 bg-orange-50/50 hover:bg-orange-100/50 rounded-[1.8rem] transition-all border border-orange-100 active:scale-95 text-left">
+                      <div className="flex items-center gap-5">
+                          <div className="p-4 bg-white rounded-2xl text-orange-600 shadow-sm transition-transform group-hover:scale-110"><Utensils size={28} /></div>
+                          <div>
+                            <p className="font-bold text-lg text-primary leading-none">Na Mesa</p>
+                            <p className="text-[10px] text-orange-700 opacity-60 font-black uppercase mt-1 tracking-wider">Estou no salão</p>
+                          </div>
                       </div>
+                      <ArrowRight className="text-orange-200 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" size={20} />
                   </button>
                 )}
                 {settings.isCounterPickupActive && (
-                  <button onClick={() => { setOrderType('BALCAO'); setHasSelectedMode(true); }} className="flex items-center gap-4 p-4 bg-blue-50 hover:bg-blue-100 rounded-3xl transition-all border border-blue-200 group text-left">
-                      <div className="p-3 bg-white rounded-2xl text-blue-600 shadow-sm"><ShoppingBag size={24} /></div>
-                      <div>
-                        <p className="font-bold text-base text-primary leading-none">Balcão</p>
-                        <p className="text-[10px] text-blue-700 opacity-60 font-bold uppercase mt-1">Retirada rápida</p>
+                  <button onClick={() => selectMode('BALCAO')} className="group flex items-center justify-between p-5 bg-blue-50/50 hover:bg-blue-100/50 rounded-[1.8rem] transition-all border border-blue-100 active:scale-95 text-left">
+                      <div className="flex items-center gap-5">
+                          <div className="p-4 bg-white rounded-2xl text-blue-600 shadow-sm transition-transform group-hover:scale-110"><ShoppingBag size={28} /></div>
+                          <div>
+                            <p className="font-bold text-lg text-primary leading-none">Balcão</p>
+                            <p className="text-[10px] text-blue-700 opacity-60 font-black uppercase mt-1 tracking-wider">Vou retirar aqui</p>
+                          </div>
                       </div>
+                      <ArrowRight className="text-blue-200 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" size={20} />
                   </button>
                 )}
                 {settings.isDeliveryActive && (
-                  <button onClick={() => { setOrderType('ENTREGA'); setHasSelectedMode(true); }} className="flex items-center gap-4 p-4 bg-green-50 hover:bg-green-100 rounded-3xl transition-all border border-green-200 group text-left">
-                      <div className="p-3 bg-white rounded-2xl text-green-600 shadow-sm"><Truck size={24} /></div>
-                      <div>
-                        <p className="font-bold text-base text-primary leading-none">Entrega</p>
-                        <p className="text-[10px] text-green-700 opacity-60 font-bold uppercase mt-1">Receber em casa</p>
+                  <button onClick={() => selectMode('ENTREGA')} className="group flex items-center justify-between p-5 bg-green-50/50 hover:bg-green-100/50 rounded-[1.8rem] transition-all border border-green-100 active:scale-95 text-left">
+                      <div className="flex items-center gap-5">
+                          <div className="p-4 bg-white rounded-2xl text-green-600 shadow-sm transition-transform group-hover:scale-110"><Truck size={28} /></div>
+                          <div>
+                            <p className="font-bold text-lg text-primary leading-none">Entrega</p>
+                            <p className="text-[10px] text-green-700 opacity-60 font-black uppercase mt-1 tracking-wider">Receber em casa</p>
+                          </div>
                       </div>
+                      <ArrowRight className="text-green-200 group-hover:text-green-400 group-hover:translate-x-1 transition-all" size={20} />
                   </button>
                 )}
+                
+                {/* Fallback se nada estiver ativo */}
                 {!settings.isTableOrderActive && !settings.isCounterPickupActive && !settings.isDeliveryActive && (
-                  <div className="text-center p-4 text-gray-400 italic text-sm">Nenhum canal de pedido disponível.</div>
+                  <div className="text-center p-6 bg-gray-50 rounded-3xl text-gray-400 italic text-sm border border-dashed border-gray-200">
+                    Nenhum canal de pedido disponível.
+                  </div>
                 )}
             </div>
           )}

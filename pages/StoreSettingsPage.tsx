@@ -27,7 +27,9 @@ import {
   Upload,
   AlertTriangle,
   Power,
-  Layers
+  Layers,
+  LayoutGrid,
+  Utensils
 } from 'lucide-react';
 
 interface Props {
@@ -203,6 +205,31 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave }) => {
                 {localSettings.isStoreOpen ? 'LOJA ABERTA' : 'LOJA FECHADA'}
               </span>
               <Switch checked={localSettings.isStoreOpen ?? true} onChange={(v) => setLocalSettings({...localSettings, isStoreOpen: v})} />
+            </div>
+
+            <div className="w-full mt-6 space-y-3 pt-6 border-t border-gray-100">
+                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-center mb-2">Canais de Venda</p>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center gap-2">
+                        <Utensils size={16} className="text-orange-500" />
+                        <span className="text-xs font-bold text-gray-600">Pedidos Mesa</span>
+                    </div>
+                    <Switch checked={localSettings.isTableOrderActive} onChange={(v) => setLocalSettings({...localSettings, isTableOrderActive: v})} />
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center gap-2">
+                        <ShoppingBag size={16} className="text-blue-500" />
+                        <span className="text-xs font-bold text-gray-600">Pedidos Balcão</span>
+                    </div>
+                    <Switch checked={localSettings.isCounterPickupActive} onChange={(v) => setLocalSettings({...localSettings, isCounterPickupActive: v})} />
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center gap-2">
+                        <Truck size={16} className="text-green-500" />
+                        <span className="text-xs font-bold text-gray-600">Pedidos Entrega</span>
+                    </div>
+                    <Switch checked={localSettings.isDeliveryActive} onChange={(v) => setLocalSettings({...localSettings, isDeliveryActive: v})} />
+                </div>
             </div>
           </section>
 
