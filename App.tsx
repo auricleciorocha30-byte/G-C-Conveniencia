@@ -31,7 +31,7 @@ import OrdersList from './pages/OrdersList.tsx';
 import StoreSettingsPage from './pages/StoreSettingsPage.tsx';
 import DigitalMenu from './pages/DigitalMenu.tsx';
 import TVBoard from './pages/TVBoard.tsx';
-import WaitressPanel from './pages/WaitressPanel.tsx';
+import AttendantPanel from './pages/AttendantPanel.tsx';
 import LoginPage from './pages/LoginPage.tsx';
 import WaitstaffManagement from './pages/WaitstaffManagement.tsx';
 import KitchenBoard from './pages/KitchenBoard.tsx';
@@ -96,7 +96,6 @@ export default function App() {
     category: p.category,
     image_url: p.imageUrl,
     is_active: p.isActive,
-    // Corrected p.featured_day to p.featuredDay to match Product interface
     featured_day: p.featuredDay === undefined || p.featuredDay === -1 ? null : p.featuredDay,
     is_by_weight: p.isByWeight
   });
@@ -112,7 +111,7 @@ export default function App() {
     customerName: dbOrder.customer_name,
     customerPhone: dbOrder.customer_phone,
     deliveryAddress: dbOrder.delivery_address,
-    payment_method: dbOrder.payment_method,
+    paymentMethod: dbOrder.payment_method,
     notes: dbOrder.notes,
     changeFor: dbOrder.change_for ? Number(dbOrder.change_for) : undefined,
     waitstaffName: dbOrder.waitstaff_name,
@@ -122,11 +121,10 @@ export default function App() {
   });
 
   const mapOrderToDb = (order: Order) => {
-    // Garante que o ID seja numérico se possível para evitar erros de bigint
     const numericId = !isNaN(Number(order.id)) ? Number(order.id) : Date.now();
     
     return {
-      id: numericId, // Adicionado ID explicitamente para evitar erro de not-null
+      id: numericId,
       type: order.type,
       items: order.items,
       status: order.status,
@@ -293,7 +291,7 @@ export default function App() {
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} />} />
         </Route>
         <Route path="/cozinha" element={<KitchenBoard orders={orders} updateStatus={updateOrderStatus} />} />
-        <Route path="/garconete" element={<WaitressPanel orders={orders} settings={settings} onSelectTable={setActiveTable} />} />
+        <Route path="/atendimento" element={<AttendantPanel orders={orders} settings={settings} onSelectTable={setActiveTable} />} />
         <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!localStorage.getItem('vovo-guta-waitstaff')} />} />
         <Route path="/tv" element={<TVBoard orders={orders} settings={settings} products={products} />} />
         <Route path="*" element={<Navigate to="/cardapio" />} />

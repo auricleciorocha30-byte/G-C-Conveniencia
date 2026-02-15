@@ -154,8 +154,8 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings }) => {
             color="bg-blue-50 text-blue-600 border-blue-100" 
           />
           <OpPanelLink 
-            to="#/garconete" 
-            label="Painel Atendimento" 
+            to="#/atendimento" 
+            label="Painel Atendente" 
             icon={<UserRound size={24} />} 
             color="bg-orange-50 text-orange-600 border-orange-100" 
           />

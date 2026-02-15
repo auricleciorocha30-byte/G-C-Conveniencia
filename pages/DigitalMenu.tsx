@@ -453,6 +453,55 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       </main>
 
+      {/* NOVO: Modal de Seleção de Peso */}
+      {weightProduct && (
+        <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl animate-scale-up overflow-hidden border border-orange-100">
+            <div className="p-8 border-b bg-orange-50 text-center">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm border border-orange-100 text-orange-500">
+                <Scale size={32} />
+              </div>
+              <h2 className="text-xl font-bold text-primary">{weightProduct.name}</h2>
+              <p className="text-[10px] font-black uppercase text-orange-400 tracking-widest mt-1">Preço: R$ {weightProduct.price.toFixed(2)}/kg</p>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="space-y-2">
+                <label className="text-[11px] font-black uppercase text-gray-400 ml-1 tracking-widest">Peso em Gramas</label>
+                <div className="relative">
+                   <input 
+                    type="number" 
+                    autoFocus
+                    placeholder="Ex: 250" 
+                    value={selectedWeightGrams} 
+                    onChange={e => setSelectedWeightGrams(e.target.value)}
+                    className="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-black text-2xl text-center focus:ring-2 focus:ring-orange-200 transition-all"
+                  />
+                  <span className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-300 font-bold">g</span>
+                </div>
+              </div>
+
+              {selectedWeightGrams && parseFloat(selectedWeightGrams) > 0 && (
+                <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 text-center animate-fade-in">
+                   <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest leading-none mb-1">Valor Calculado</p>
+                   <p className="text-2xl font-brand font-bold text-primary">R$ {((weightProduct.price * parseFloat(selectedWeightGrams)) / 1000).toFixed(2)}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button onClick={() => setWeightProduct(null)} className="flex-1 py-4 text-gray-400 font-bold text-xs uppercase tracking-widest">Cancelar</button>
+                <button 
+                  disabled={!selectedWeightGrams || parseFloat(selectedWeightGrams) <= 0}
+                  onClick={confirmWeightAddition} 
+                  className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold shadow-xl active:scale-95 transition-all text-xs uppercase tracking-widest disabled:opacity-30"
+                >
+                  Adicionar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isCartOpen && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center">
           <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-slide-up">
