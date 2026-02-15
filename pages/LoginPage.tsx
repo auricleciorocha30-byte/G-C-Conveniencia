@@ -1,17 +1,34 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Lock, LogIn, Loader2, AlertCircle, ShieldCheck, Mail, Smartphone } from 'lucide-react';
+import { 
+  Lock, 
+  LogIn, 
+  Loader2, 
+  AlertCircle, 
+  ShieldCheck, 
+  Mail, 
+  Smartphone,
+  ChefHat,
+  UserRound,
+  Tv,
+  Store,
+  ArrowRight,
+  Monitor
+} from 'lucide-react';
 
 interface Props {
   onLoginSuccess: (user: any) => void;
 }
 
 export default function LoginPage({ onLoginSuccess }: Props) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'hub' | 'login'>('hub');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,83 +62,165 @@ export default function LoginPage({ onLoginSuccess }: Props) {
     }
   };
 
+  const PortalButton = ({ icon: Icon, title, description, to, color }: any) => (
+    <button 
+      onClick={() => navigate(to)}
+      className="group flex items-center gap-5 p-6 bg-white rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-orange-100 transition-all text-left active:scale-95"
+    >
+      <div className={`p-4 rounded-2xl ${color} text-white shadow-lg shadow-black/5 group-hover:scale-110 transition-transform`}>
+        <Icon size={28} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <h3 className="font-bold text-gray-800 leading-none mb-1">{title}</h3>
+        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{description}</p>
+      </div>
+      <ArrowRight size={20} className="text-gray-200 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" />
+    </button>
+  );
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#fff5e1] p-6 relative overflow-hidden text-zinc-900">
       <div className="absolute -top-24 -left-24 w-64 h-64 bg-orange-500 rounded-full opacity-10 blur-3xl"></div>
       <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-primary rounded-full opacity-10 blur-3xl"></div>
 
-      <div className="bg-white w-full max-w-md rounded-[3rem] p-8 md:p-12 shadow-2xl relative z-10 border border-orange-100">
-        <div className="text-center mb-10">
-          <div className="w-20 h-20 bg-primary rounded-3xl mx-auto flex items-center justify-center mb-6 shadow-xl transform rotate-3 hover:rotate-0 transition-transform duration-500 text-secondary">
-            <ShieldCheck size={40} />
+      <div className="bg-white/40 backdrop-blur-md w-full max-w-2xl rounded-[3rem] p-2 shadow-2xl relative z-10 border border-white/20">
+        <div className="bg-white rounded-[2.8rem] p-8 md:p-12 space-y-10">
+          
+          <div className="text-center">
+            <div className="w-20 h-20 bg-primary rounded-3xl mx-auto flex items-center justify-center mb-6 shadow-xl transform rotate-3 hover:rotate-0 transition-transform duration-500 text-secondary">
+              <Store size={40} />
+            </div>
+            <h1 className="text-3xl font-brand font-bold text-primary">Portal do Colaborador</h1>
+            <p className="text-sm text-gray-400 mt-2 uppercase font-black tracking-widest">G & C Conveniência</p>
           </div>
-          <h1 className="text-3xl font-brand font-bold text-primary">Painel Admin</h1>
-          <p className="text-sm text-gray-400 mt-2">Acesso Exclusivo Supabase Auth</p>
-        </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl flex items-center gap-3 text-sm animate-shake">
-            <AlertCircle size={18} />
-            <span className="flex-1 font-medium">{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-500 uppercase ml-4 tracking-widest">E-mail</label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input 
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-secondary/20 focus:bg-white transition-all text-gray-700 font-medium"
-                placeholder="seu@email.com"
+          {view === 'hub' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-scale-up">
+              <PortalButton 
+                icon={UserRound} 
+                title="Atendimento" 
+                description="Painel de Mesas" 
+                to="/atendimento" 
+                color="bg-orange-500" 
               />
+              <PortalButton 
+                icon={ChefHat} 
+                title="Cozinha" 
+                description="Painel de Produção" 
+                to="/cozinha" 
+                color="bg-blue-600" 
+              />
+              <PortalButton 
+                icon={Tv} 
+                title="Painel TV" 
+                description="Exibição de Pedidos" 
+                to="/tv" 
+                color="bg-purple-600" 
+              />
+              <button 
+                onClick={() => setView('login')}
+                className="group flex items-center gap-5 p-6 bg-primary rounded-[2rem] border border-primary/10 shadow-lg text-left active:scale-95"
+              >
+                <div className="p-4 rounded-2xl bg-white/10 text-secondary shadow-lg group-hover:scale-110 transition-transform">
+                  <ShieldCheck size={28} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-white leading-none mb-1">Gerência</h3>
+                  <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Acesso Administrativo</p>
+                </div>
+                <ArrowRight size={20} className="text-white/20 group-hover:text-secondary group-hover:translate-x-1 transition-all" />
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-8 animate-scale-up">
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl flex items-center gap-3 text-sm animate-shake">
+                  <AlertCircle size={18} />
+                  <span className="flex-1 font-medium">{error}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleLogin} className="space-y-6">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase ml-4 tracking-widest">E-mail Administrativo</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-secondary/20 focus:bg-white transition-all text-gray-700 font-medium"
+                      placeholder="admin@conveniencia.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase ml-4 tracking-widest">Senha</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-secondary/20 focus:bg-white transition-all text-gray-700"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <button 
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-primary text-white py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 hover:opacity-90 transition-all shadow-xl shadow-black/10 disabled:opacity-50 group"
+                  >
+                    {loading ? <Loader2 className="animate-spin" size={24} /> : (
+                      <>
+                        Entrar no Gerenciamento
+                        <LogIn size={20} className="group-hover:translate-x-1 transition-transform" />
+                      </>
+                    )}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setView('hub')}
+                    className="w-full py-4 text-gray-400 font-bold text-xs uppercase tracking-[0.2em]"
+                  >
+                    Voltar ao Portal
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          <div className="pt-6 border-t border-gray-100 text-center space-y-4">
+            <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.3em]">Setup & Atalhos</p>
+            <div className="flex flex-wrap justify-center gap-4">
+              <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
+                <Smartphone size={14} /> Atendimento Mobile
+              </div>
+              <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
+                <Monitor size={14} /> Cozinha Tablet
+              </div>
+              <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
+                <Tv size={14} /> Monitor de TV
+              </div>
+            </div>
+            <div className="pt-4">
+               <a 
+                href="https://wa.me/5585987582159" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 text-[10px] font-bold text-secondary hover:text-orange-600 transition-colors"
+              >
+                SUPORTE TÉCNICO: 85987582159
+              </a>
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-500 uppercase ml-4 tracking-widest">Senha</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input 
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-secondary/20 focus:bg-white transition-all text-gray-700"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
-
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full bg-primary text-white py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 hover:opacity-90 transition-all shadow-xl shadow-black/10 disabled:opacity-50 mt-4 group"
-          >
-            {loading ? <Loader2 className="animate-spin" size={24} /> : (
-              <>
-                Entrar no Sistema
-                <LogIn size={20} className="group-hover:translate-x-1 transition-transform" />
-              </>
-            )}
-          </button>
-        </form>
-
-        <div className="mt-10 pt-6 border-t border-gray-100 text-center space-y-2">
-          <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">Desenvolvido por D.I</p>
-          <p className="text-[9px] text-gray-400 font-bold">Cnpj: 23.159.325/0001-17</p>
-          <a 
-            href="https://wa.me/5585987582159" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-1.5 text-[10px] font-bold text-secondary hover:text-orange-600 transition-colors"
-          >
-            <Smartphone size={12} /> Suporte: WhatsApp 85987582159
-          </a>
         </div>
       </div>
       

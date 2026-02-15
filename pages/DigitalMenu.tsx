@@ -26,7 +26,8 @@ import {
   Info,
   Phone,
   Navigation,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff } from '../types';
 
@@ -125,7 +126,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     }
     
     if (isWaitstaff) {
-      onLogout(); // Limpa a mesa selecionada no App.tsx
+      onLogout();
       navigate('/atendimento');
       return;
     }
@@ -462,9 +463,9 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                   {settings.isStoreOpen ? 'Aberto Agora' : 'Fechado no Momento'}
                </div>
             </div>
-            <div className="p-8 space-y-6">
+            <div className="p-8 space-y-4">
                {settings.address && (
-                 <div className="flex items-start gap-4">
+                 <div className="flex items-start gap-4 p-2">
                     <div className="p-3 bg-gray-50 rounded-2xl text-primary border border-gray-100"><MapPin size={20} /></div>
                     <div className="min-w-0">
                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Localização</p>
@@ -476,7 +477,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                  </div>
                )}
                {settings.whatsapp && (
-                 <div className="flex items-start gap-4">
+                 <div className="flex items-start gap-4 p-2">
                     <div className="p-3 bg-gray-50 rounded-2xl text-green-600 border border-gray-100"><Phone size={20} /></div>
                     <div className="min-w-0">
                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">WhatsApp</p>
@@ -487,9 +488,18 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                     </div>
                  </div>
                )}
-               <button onClick={() => setIsInfoOpen(false)} className="w-full py-4 bg-primary text-white rounded-2xl font-bold shadow-xl active:scale-95 transition-all text-xs uppercase tracking-widest mt-4">
-                  Fechar
-               </button>
+               
+               <div className="pt-4 border-t border-gray-100 space-y-3">
+                  <button 
+                    onClick={() => { setIsInfoOpen(false); navigate('/login'); }} 
+                    className="w-full py-4 bg-primary text-white rounded-2xl font-bold shadow-xl active:scale-95 transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2"
+                  >
+                    <ShieldCheck size={18} /> Acesso Administrativo
+                  </button>
+                  <button onClick={() => setIsInfoOpen(false)} className="w-full py-3 text-gray-400 font-bold text-xs uppercase tracking-widest">
+                    Voltar
+                  </button>
+               </div>
             </div>
           </div>
         </div>
