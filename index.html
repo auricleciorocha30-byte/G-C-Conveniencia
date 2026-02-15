@@ -32,6 +32,21 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
     </style>
+    <!-- Script Anti-Flicker de Tema -->
+    <script>
+      (function() {
+        try {
+          const cached = localStorage.getItem('gc-conveniencia-settings-v1');
+          if (cached) {
+            const settings = JSON.parse(cached);
+            if (settings.primaryColor) document.documentElement.style.setProperty('--primary-color', settings.primaryColor);
+            if (settings.secondaryColor) document.documentElement.style.setProperty('--secondary-color', settings.secondaryColor);
+          }
+        } catch (e) {
+          console.error("Erro ao aplicar tema pré-render:", e);
+        }
+      })();
+    </script>
 <script type="importmap">
 {
   "imports": {

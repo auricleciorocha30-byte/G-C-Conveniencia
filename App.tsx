@@ -21,7 +21,6 @@ import {
   Bell
 } from 'lucide-react';
 import { supabase } from './lib/supabase.ts';
-// Fix: Added OrderStatus to the imports from types.ts
 import { Product, Order, StoreSettings, Waitstaff, OrderStatus } from './types.ts';
 import { INITIAL_SETTINGS } from './constants.ts';
 
@@ -129,7 +128,7 @@ export default function App() {
     customer_name: order.customerName,
     customer_phone: order.customerPhone,
     delivery_address: order.deliveryAddress,
-    payment_method: order.payment_method,
+    payment_method: order.paymentMethod,
     waitstaff_name: order.waitstaffName,
     change_for: order.changeFor,
     coupon_applied: order.couponApplied,
@@ -228,6 +227,20 @@ export default function App() {
             return next;
           });
         }
+        if (payload.eventType === 'DELETE') {
+          setProducts(prev => {
+            const next = prev.filter(p => p.id !== payload.old.id);
+            localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(next));
+            return next;
+          });
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, (payload) => {
+        if (payload.new?.data) {
+          setSettings(payload.new.data);
+          localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(payload.new.data));
+          applyColors(payload.new.data);
+        }
       })
       .subscribe();
 
@@ -242,6 +255,7 @@ export default function App() {
   const handleSaveProduct = async (p: Product) => {
     const { error } = await supabase.from('products').upsert([mapProductToDb(p)]);
     if (error) throw error;
+    
     setProducts(prev => {
       const next = prev.some(item => item.id === p.id) ? prev.map(item => item.id === p.id ? p : item) : [...prev, p];
       localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(next));
@@ -250,8 +264,13 @@ export default function App() {
   };
 
   const handleDeleteProduct = async (id: string) => {
-    await supabase.from('products').delete().eq('id', id);
-    setProducts(prev => prev.filter(p => p.id !== id));
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) throw error;
+    setProducts(prev => {
+      const next = prev.filter(p => p.id !== id);
+      localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(next));
+      return next;
+    });
   };
 
   const updateOrderStatus = async (id: string, status: OrderStatus) => {
@@ -259,10 +278,17 @@ export default function App() {
   };
 
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
-    await supabase.from('settings').upsert({ id: 'store', data: newSettings });
+    const { error } = await supabase.from('settings').upsert({ id: 'store', data: newSettings });
+    if (error) throw error;
+    
     setSettings(newSettings);
     localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(newSettings));
     applyColors(newSettings);
+  };
+
+  const handleLogoutAdmin = async () => {
+    await supabase.auth.signOut();
+    setAdminUser(null);
   };
 
   if (authLoading) return <div className="min-h-screen bg-primary flex items-center justify-center"><Loader2 className="animate-spin text-secondary" size={48} /></div>;
@@ -272,7 +298,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={adminUser ? <Navigate to="/" /> : <LoginPage onLoginSuccess={setAdminUser} />} />
         
-        <Route path="/" element={adminUser ? <AdminLayout settings={settings} onLogout={() => supabase.auth.signOut()} /> : <Navigate to="/login" />}>
+        <Route path="/" element={adminUser ? <AdminLayout settings={settings} onLogout={handleLogoutAdmin} /> : <Navigate to="/login" />}>
           <Route index element={<AdminDashboard orders={orders} products={products} settings={settings} />} />
           <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={handleSaveProduct} deleteProduct={handleDeleteProduct} categories={categories} setCategories={setCategories} />} />
           <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} />} />
