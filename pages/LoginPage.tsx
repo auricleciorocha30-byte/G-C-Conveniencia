@@ -19,7 +19,6 @@ export default function LoginPage({ onLoginSuccess }: Props) {
     setError(null);
 
     try {
-      // Autenticação Direta e Única via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password.trim(),
@@ -33,11 +32,10 @@ export default function LoginPage({ onLoginSuccess }: Props) {
       }
 
       if (authData.user) {
-        // Mapeia os dados do Supabase para o formato esperado pelo App
         onLoginSuccess({
           id: authData.user.id,
           name: authData.user.email?.split('@')[0] || 'Administrador',
-          role: 'GERENTE' // Define como Gerente para acesso total
+          role: 'GERENTE'
         });
       }
     } catch (err: any) {

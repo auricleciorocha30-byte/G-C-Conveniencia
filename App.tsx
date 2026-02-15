@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, Navigate, Outlet } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -17,7 +17,8 @@ import {
   ChefHat,
   Wifi,
   WifiOff,
-  RefreshCw
+  RefreshCw,
+  Bell
 } from 'lucide-react';
 import { supabase } from './lib/supabase.ts';
 import { Product, Order, StoreSettings, Waitstaff } from './types.ts';
@@ -47,7 +48,6 @@ const CACHE_KEYS = {
 };
 
 export default function App() {
-  // Inicializa estados com cache local para carregamento instantâneo
   const [products, setProducts] = useState<Product[]>(() => {
     const cached = localStorage.getItem(CACHE_KEYS.PRODUCTS);
     return cached ? JSON.parse(cached) : [];
@@ -67,12 +67,19 @@ export default function App() {
   const [activeTable, setActiveTable] = useState<string | null>(null);
   const [isWaitstaff, setIsWaitstaff] = useState(() => !!localStorage.getItem('vovo-guta-waitstaff'));
 
+  // Ref para evitar tocar som no carregamento inicial
+  const initialLoadRef = useRef(true);
+
+  const playAudio = (url: string) => {
+    const audio = new Audio(url);
+    audio.play().catch(e => console.warn('Bloqueio de áudio do navegador:', e));
+  };
+
   const applyColors = useCallback((s: StoreSettings) => {
     document.documentElement.style.setProperty('--primary-color', s.primaryColor || '#001F3F');
     document.documentElement.style.setProperty('--secondary-color', s.secondaryColor || '#FFD700');
   }, []);
 
-  // Aplica cores iniciais do cache
   useEffect(() => {
     applyColors(settings);
   }, [settings, applyColors]);
@@ -85,7 +92,7 @@ export default function App() {
     }
     return {
       ...dbOrder,
-      createdAt: Number(dbOrder.created_at),
+      createdAt: dbOrder.created_at ? new Date(dbOrder.created_at).getTime() : Date.now(),
       tableNumber: dbOrder.table_number,
       customerName: dbOrder.customer_name,
       customerPhone: dbOrder.customer_phone,
@@ -109,49 +116,86 @@ export default function App() {
     isByWeight: p.is_by_weight ?? false
   });
 
-  // Função centralizada para adicionar pedidos (com suporte Offline)
+  const mapProductToDb = (p: Product) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price: p.price,
+    category: p.category,
+    image_url: p.imageUrl,
+    is_active: p.isActive,
+    featured_day: p.featuredDay,
+    is_by_weight: p.isByWeight
+  });
+
+  const mapOrderToDb = (order: Order) => ({
+    id: order.id,
+    type: order.type,
+    items: order.items,
+    status: order.status,
+    total: order.total,
+    created_at: new Date(order.createdAt).toISOString(),
+    notes: order.notes,
+    table_number: order.tableNumber,
+    customer_name: order.customerName,
+    customer_phone: order.customerPhone,
+    delivery_address: order.deliveryAddress,
+    payment_method: order.paymentMethod,
+    waitstaff_name: order.waitstaffName,
+    change_for: order.changeFor,
+    coupon_applied: order.couponApplied,
+    discount_amount: order.discountAmount
+  });
+
+  // RESTAURAÇÃO DA SESSÃO AO REFRESH
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setAdminUser({
+          id: session.user.id,
+          name: session.user.email?.split('@')[0] || 'Admin',
+          role: 'GERENTE'
+        });
+      }
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setAdminUser({
+          id: session.user.id,
+          name: session.user.email?.split('@')[0] || 'Admin',
+          role: 'GERENTE'
+        });
+      } else {
+        setAdminUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const addOrder = async (order: Order) => {
     const orderToSave = { ...order, isSynced: isOnline };
-    
-    // 1. Salva no estado local para feedback imediato
     setOrders(prev => [orderToSave, ...prev]);
 
     if (!isOnline) {
-      // 2. Se offline, salva na fila do LocalStorage
       const offline = localStorage.getItem(CACHE_KEYS.OFFLINE_ORDERS);
       const queue = offline ? JSON.parse(offline) : [];
       localStorage.setItem(CACHE_KEYS.OFFLINE_ORDERS, JSON.stringify([...queue, orderToSave]));
       return;
     }
 
-    // 3. Se online, envia para o banco
     try {
-      const dbPayload: any = {
-        id: order.id,
-        type: order.type,
-        items: order.items,
-        status: order.status,
-        total: order.total,
-        created_at: order.createdAt,
-        notes: order.notes,
-        table_number: order.tableNumber,
-        customer_name: order.customerName,
-        customer_phone: order.customerPhone,
-        delivery_address: order.deliveryAddress,
-        payment_method: order.paymentMethod,
-        waitstaff_name: order.waitstaffName,
-        change_for: order.changeFor
-      };
-      await supabase.from('orders').insert([dbPayload]);
+      const { error } = await supabase.from('orders').insert([mapOrderToDb(order)]);
+      if (error) throw error;
     } catch (err) {
-      // Fallback para fila se der erro de rede inesperado
       const offline = localStorage.getItem(CACHE_KEYS.OFFLINE_ORDERS);
       const queue = offline ? JSON.parse(offline) : [];
       localStorage.setItem(CACHE_KEYS.OFFLINE_ORDERS, JSON.stringify([...queue, orderToSave]));
     }
   };
 
-  // Sincronizador de pedidos pendentes
   const syncOfflineOrders = useCallback(async () => {
     if (!navigator.onLine || syncing) return;
     const offline = localStorage.getItem(CACHE_KEYS.OFFLINE_ORDERS);
@@ -165,23 +209,7 @@ export default function App() {
 
     for (const order of queue) {
       try {
-        const dbPayload: any = {
-          id: order.id,
-          type: order.type,
-          items: order.items,
-          status: order.status,
-          total: order.total,
-          created_at: order.createdAt,
-          notes: order.notes,
-          table_number: order.tableNumber,
-          customer_name: order.customerName,
-          customer_phone: order.customerPhone,
-          delivery_address: order.deliveryAddress,
-          payment_method: order.paymentMethod,
-          waitstaff_name: order.waitstaffName,
-          change_for: order.changeFor
-        };
-        const { error } = await supabase.from('orders').insert([dbPayload]);
+        const { error } = await supabase.from('orders').insert([mapOrderToDb(order)]);
         if (!error) successfullySynced.push(order.id);
       } catch (e) {}
     }
@@ -210,7 +238,7 @@ export default function App() {
         const [pRes, cRes, oRes, sRes] = await Promise.all([
           supabase.from('products').select('*').order('name'),
           supabase.from('categories').select('*').order('name'),
-          supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(50),
+          supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100),
           supabase.from('settings').select('data').eq('id', 'store').maybeSingle()
         ]);
 
@@ -229,24 +257,33 @@ export default function App() {
           localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(loadedSettings));
           applyColors(loadedSettings);
         }
+        initialLoadRef.current = false;
       } catch (err) {
         console.warn('Operando em modo Offline (Dados do Cache)');
-      } finally {
-        setAuthLoading(false);
       }
     };
 
     fetchInitialData();
 
-    // Inscrição em Realtime para atualizações imediatas
     const channel = supabase
-      .channel('vovo-guta-sync')
+      .channel('vovo-guta-sync-v2')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setOrders(prev => [mapOrderFromDb(payload.new), ...prev]);
+          const newOrder = mapOrderFromDb(payload.new);
+          setOrders(prev => {
+            if (prev.some(o => o.id === newOrder.id)) return prev;
+            if (!initialLoadRef.current) playAudio(SOUNDS.NEW_ORDER);
+            return [newOrder, ...prev];
+          });
         } else if (payload.eventType === 'UPDATE') {
           const updated = mapOrderFromDb(payload.new);
-          setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+          setOrders(prev => {
+            const oldOrder = prev.find(o => o.id === updated.id);
+            if (oldOrder?.status !== 'PRONTO' && updated.status === 'PRONTO') {
+                if (!initialLoadRef.current) playAudio(SOUNDS.ORDER_READY);
+            }
+            return prev.map(o => o.id === updated.id ? updated : o);
+          });
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, (payload) => {
@@ -279,9 +316,21 @@ export default function App() {
     }
   };
 
+  const handleLogoutAdmin = async () => {
+    await supabase.auth.signOut();
+    setAdminUser(null);
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-primary flex items-center justify-center">
+        <Loader2 className="animate-spin text-secondary" size={48} />
+      </div>
+    );
+  }
+
   return (
     <HashRouter>
-      {/* Indicador de Conexão Flutuante */}
       {!isOnline && (
         <div className="fixed top-20 right-4 z-[100] bg-red-600 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase flex items-center gap-2 shadow-2xl animate-bounce">
           <WifiOff size={14} /> Modo Offline
@@ -296,9 +345,20 @@ export default function App() {
       <Routes>
         <Route path="/login" element={adminUser ? <Navigate to="/" /> : <LoginPage onLoginSuccess={setAdminUser} />} />
         
-        <Route path="/" element={adminUser ? <AdminLayout settings={settings} onLogout={() => setAdminUser(null)} /> : <Navigate to="/login" />}>
+        <Route path="/" element={adminUser ? <AdminLayout settings={settings} onLogout={handleLogoutAdmin} /> : <Navigate to="/login" />}>
           <Route index element={<AdminDashboard orders={orders} products={products} settings={settings} />} />
-          <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={async (p) => { await supabase.from('products').upsert(p); }} deleteProduct={async (id) => { await supabase.from('products').delete().eq('id', id); }} categories={categories} setCategories={setCategories} />} />
+          <Route path="cardapio-admin" element={<MenuManagement 
+            products={products} 
+            saveProduct={async (p) => { 
+                const { error } = await supabase.from('products').upsert([mapProductToDb(p)]);
+                if (error) throw error;
+            }} 
+            deleteProduct={async (id) => { 
+                await supabase.from('products').delete().eq('id', id); 
+            }} 
+            categories={categories} 
+            setCategories={setCategories} 
+          />} />
           <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} />} />
           <Route path="equipe" element={<WaitstaffManagement settings={settings} onUpdateSettings={handleUpdateSettings} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} />} />
