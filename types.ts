@@ -48,6 +48,7 @@ export interface Order {
   waitstaffName?: string;
   couponApplied?: string;
   discountAmount?: number;
+  isSynced?: boolean; // Nova flag para controle offline
 }
 
 export interface StoreSettings {
@@ -69,10 +70,5 @@ export interface StoreSettings {
   isCouponActive?: boolean;
   isCouponForAllProducts?: boolean;
   applicableProductIds?: string[];
-}
-
-export interface Coupon {
-  code: string;
-  discount: number;
-  isActive: boolean;
+  lastUpdate?: number;
 }
