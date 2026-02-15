@@ -222,11 +222,9 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     setIsSending(true);
     const orderChangeFor = (payment === 'DINHEIRO' && changeFor) ? parseFloat(changeFor.replace(',', '.')) : undefined;
     
-    // Gera um ID aleatório para o pedido localmente antes da sincronização
-    const randomId = Math.random().toString(36).substr(2, 5).toUpperCase();
-
+    // Deixamos o ID vazio para o Supabase gerar automaticamente (BigInt Identity)
     const finalOrder: Order = {
-      id: randomId,
+      id: "PENDING", // Placeholder, o App.tsx vai lidar com a resposta do DB
       type: orderType, 
       items: cart, 
       status: 'PREPARANDO', 

@@ -78,7 +78,7 @@ export default function App() {
   }, []);
 
   const mapProductFromDb = (p: any): Product => ({
-    id: p.id,
+    id: p.id.toString(),
     name: p.name,
     description: p.description || '',
     price: Number(p.price),
@@ -90,7 +90,6 @@ export default function App() {
   });
 
   const mapProductToDb = (p: Product) => ({
-    id: p.id,
     name: p.name,
     description: p.description,
     price: p.price,
@@ -102,12 +101,12 @@ export default function App() {
   });
 
   const mapOrderFromDb = (dbOrder: any): Order => ({
-    id: dbOrder.id,
+    id: dbOrder.id.toString(),
     type: dbOrder.type,
     items: dbOrder.items,
     status: dbOrder.status,
     total: Number(dbOrder.total),
-    createdAt: dbOrder.created_at ? new Date(dbOrder.created_at).getTime() : Date.now(),
+    createdAt: dbOrder.created_at ? (isNaN(Number(dbOrder.created_at)) ? new Date(dbOrder.created_at).getTime() : Number(dbOrder.created_at)) : Date.now(),
     tableNumber: dbOrder.table_number,
     customerName: dbOrder.customer_name,
     customerPhone: dbOrder.customer_phone,
@@ -122,12 +121,13 @@ export default function App() {
   });
 
   const mapOrderToDb = (order: Order) => ({
-    id: order.id,
     type: order.type,
     items: order.items,
     status: order.status,
     total: order.total,
-    created_at: new Date(order.createdAt).toISOString(),
+    // Se o banco for int8/bigint, enviamos o número. Se for timestamptz, Postgres converte o número ou ISO String.
+    // Para evitar erro de sintaxe BigInt, enviamos o número puro do Date.now()
+    created_at: order.createdAt, 
     notes: order.notes,
     table_number: order.tableNumber,
     customer_name: order.customerName,
@@ -175,7 +175,7 @@ export default function App() {
         const [pRes, cRes, oRes, sRes] = await Promise.all([
           supabase.from('products').select('*').order('name'),
           supabase.from('categories').select('*').order('name'),
-          supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(200),
+          supabase.from('orders').select('*').order('id', { ascending: false }).limit(200),
           supabase.from('settings').select('data').eq('id', 'store').maybeSingle()
         ]);
 
@@ -196,13 +196,12 @@ export default function App() {
         }
         initialLoadRef.current = false;
       } catch (err) {
-        console.warn('Modo offline ou erro de conexão detectado.');
+        console.warn('Modo offline detectado.');
       }
     };
     fetchData();
 
-    // REALTIME CHANNEL - Essencial para o Admin ver os pedidos na hora
-    const channel = supabase.channel('schema-db-changes')
+    const channel = supabase.channel('orders-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
         const newOrder = mapOrderFromDb(payload.new);
         setOrders(prev => {
@@ -221,34 +220,31 @@ export default function App() {
           return prev.map(o => o.id === updated.id ? updated : o);
         });
       })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, (payload) => {
-        setOrders(prev => prev.filter(o => o.id !== payload.old.id));
-      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [applyColors]);
 
   const addOrder = async (order: Order) => {
-    // Tentativa de inserção no banco
     const dbObject = mapOrderToDb(order);
-    const { error } = await supabase.from('orders').insert([dbObject]);
+    const { data, error } = await supabase.from('orders').insert([dbObject]).select();
     
     if (error) {
-      console.error("Erro Supabase ao salvar pedido:", error);
+      console.error("Erro Supabase:", error);
       throw error;
     }
 
-    // Se inseriu com sucesso, atualizamos localmente para feedback instantâneo (o Realtime também fará isso, mas aqui é mais rápido para o usuário que fez o pedido)
-    setOrders(prev => {
-      if (prev.some(o => o.id === order.id)) return prev;
-      return [order, ...prev];
-    });
+    if (data && data[0]) {
+        const insertedOrder = mapOrderFromDb(data[0]);
+        setOrders(prev => [insertedOrder, ...prev]);
+    }
   };
 
   const handleSaveProduct = async (p: Product) => {
-    const { error } = await supabase.from('products').upsert([mapProductToDb(p)]);
+    const dbObj = mapProductToDb(p);
+    const { error } = await supabase.from('products').upsert([{ ...dbObj, id: p.id.includes('.') ? undefined : p.id }]);
     if (error) throw error;
+    
     setProducts(prev => {
       const next = prev.some(item => item.id === p.id) ? prev.map(item => item.id === p.id ? p : item) : [...prev, p];
       localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(next));
@@ -267,8 +263,7 @@ export default function App() {
   };
 
   const updateOrderStatus = async (id: string, status: OrderStatus) => {
-    const { error } = await supabase.from('orders').update({ status }).eq('id', id);
-    if (error) console.error("Erro ao atualizar status:", error);
+    await supabase.from('orders').update({ status }).eq('id', id);
   };
 
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
