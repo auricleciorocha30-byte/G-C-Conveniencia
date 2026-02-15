@@ -14,7 +14,8 @@ import {
   XCircle,
   ShoppingBag,
   Truck,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { Order, OrderStatus, Waitstaff, StoreSettings } from '../types';
 import { supabase } from '../lib/supabase';
@@ -82,27 +83,51 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) =>
   const activeOrders = useMemo(() => orders.filter(o => o.status === 'PREPARANDO' || o.status === 'PRONTO'), [orders]);
 
   const occupiedTables = useMemo(() => {
-    const map = new Map<string, { status: string, count: number }>();
+    const map = new Map<string, { status: string, count: number, total: number }>();
     activeOrders.forEach(o => {
       if (o.tableNumber) {
         const current = map.get(o.tableNumber);
         const newStatus = (current?.status === 'PRONTO' || o.status === 'PRONTO') ? 'PRONTO' : 'PREPARANDO';
-        map.set(o.tableNumber, { status: newStatus, count: (current?.count || 0) + 1 });
+        map.set(o.tableNumber, { 
+            status: newStatus, 
+            count: (current?.count || 0) + 1,
+            total: (current?.total || 0) + Number(o.total)
+        });
       }
     });
     return map;
   }, [activeOrders]);
 
   const handleTableClick = (tableNum: string) => {
-    if (occupiedTables.has(tableNum)) setSelectedTableModal(tableNum);
-    else { onSelectTable(tableNum); navigate('/cardapio'); }
+    if (occupiedTables.has(tableNum)) {
+      setSelectedTableModal(tableNum);
+    } else {
+      onSelectTable(tableNum);
+      navigate('/cardapio');
+    }
   };
 
-  const handleQuickOrder = (type: string) => { onSelectTable(null); navigate(`/cardapio?tipo=${type}`); };
+  const handleQuickOrder = (type: string) => { 
+    onSelectTable(null); 
+    navigate(`/cardapio?tipo=${type}`); 
+  };
 
-  const handlePrint = (order: any) => {
-    setPrintOrder(order);
-    setTimeout(() => { window.print(); setPrintOrder(null); }, 300);
+  const handlePrintConferencia = (tableNum: string) => {
+    const tableOrders = activeOrders.filter(o => o.tableNumber === tableNum);
+    const combinedItems = tableOrders.flatMap(o => o.items);
+    const total = tableOrders.reduce((acc, o) => acc + o.total, 0);
+    
+    setPrintOrder({
+      tableNumber: tableNum,
+      items: combinedItems,
+      total: total,
+      createdAt: Date.now()
+    });
+    
+    setTimeout(() => { 
+      window.print(); 
+      setPrintOrder(null); 
+    }, 300);
   };
 
   const updateTableOrders = async (tableNum: string, status: OrderStatus) => {
@@ -112,7 +137,7 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) =>
   };
 
   return (
-    <div className="min-h-screen bg-primary p-4 md:p-8 relative">
+    <div className="min-h-screen bg-primary p-4 md:p-8 relative overflow-x-hidden">
       <style>{`
         @media print {
           body * { visibility: hidden; }
@@ -128,22 +153,42 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) =>
       <div className="max-w-5xl mx-auto space-y-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between text-white gap-4 border-b border-white/10 pb-6">
           <div className="flex items-center gap-4">
-            <div className="p-4 bg-secondary rounded-3xl shadow-xl text-white"><UserRound size={32} /></div>
+            <div className="p-4 bg-secondary rounded-3xl shadow-xl text-white">
+              <UserRound size={32} />
+            </div>
             <div>
-              <h1 className="text-3xl font-brand font-bold">Painel de Atendimento</h1>
-              <p className="text-secondary text-sm font-medium flex items-center gap-2"><Clock size={14} /> {activeWaitstaff?.name || 'Aguardando Login'}</p>
+              <h1 className="text-3xl font-brand font-bold">Painel Atendente</h1>
+              <p className="text-secondary text-sm font-medium flex items-center gap-2">
+                <Clock size={14} /> {activeWaitstaff?.name || 'Aguardando Login'}
+              </p>
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => handleQuickOrder('BALCAO')} className="flex items-center gap-2 px-4 py-3 bg-white/10 rounded-2xl hover:bg-white/20 font-bold text-xs"><ShoppingBag size={18} /> Balcão</button>
-            <button onClick={() => handleQuickOrder('ENTREGA')} className="flex items-center gap-2 px-4 py-3 bg-white/10 rounded-2xl hover:bg-white/20 font-bold text-xs"><Truck size={18} /> Entrega</button>
-            <button onClick={handleLogout} className="p-3 bg-red-500/10 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><LogOut size={24} /></button>
+            <button onClick={() => handleQuickOrder('BALCAO')} className="flex items-center gap-2 px-4 py-3 bg-white/10 rounded-2xl hover:bg-white/20 font-bold text-xs">
+              <ShoppingBag size={18} /> Balcão
+            </button>
+            <button onClick={() => handleQuickOrder('ENTREGA')} className="flex items-center gap-2 px-4 py-3 bg-white/10 rounded-2xl hover:bg-white/20 font-bold text-xs">
+              <Truck size={18} /> Entrega
+            </button>
+            <button onClick={handleLogout} className="p-3 bg-red-500/10 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all">
+              <LogOut size={24} />
+            </button>
           </div>
         </header>
 
         <div className="flex bg-white/5 p-1.5 rounded-[2rem] border border-white/10">
-          <button onClick={() => setActiveTab('MAPA')} className={`flex-1 py-4 rounded-[1.5rem] font-bold text-xs tracking-widest ${activeTab === 'MAPA' ? 'bg-secondary text-white shadow-lg' : 'text-white/40'}`}>MAPA DE MESAS</button>
-          <button onClick={() => setActiveTab('PEDIDOS')} className={`flex-1 py-4 rounded-[1.5rem] font-bold text-xs tracking-widest ${activeTab === 'PEDIDOS' ? 'bg-secondary text-white shadow-lg' : 'text-white/40'}`}>PEDIDOS ATIVOS</button>
+          <button 
+            onClick={() => setActiveTab('MAPA')} 
+            className={`flex-1 py-4 rounded-[1.5rem] font-bold text-xs tracking-widest transition-all ${activeTab === 'MAPA' ? 'bg-secondary text-white shadow-lg' : 'text-white/40 hover:text-white/60'}`}
+          >
+            MAPA DE MESAS
+          </button>
+          <button 
+            onClick={() => setActiveTab('PEDIDOS')} 
+            className={`flex-1 py-4 rounded-[1.5rem] font-bold text-xs tracking-widest transition-all ${activeTab === 'PEDIDOS' ? 'bg-secondary text-white shadow-lg' : 'text-white/40 hover:text-white/60'}`}
+          >
+            PEDIDOS ATIVOS
+          </button>
         </div>
 
         {activeTab === 'MAPA' ? (
@@ -151,42 +196,89 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) =>
             {tables.map(num => {
               const occ = occupiedTables.get(num);
               return (
-                <button key={num} onClick={() => handleTableClick(num)} className={`relative aspect-square rounded-[2rem] p-6 text-center border-2 flex flex-col items-center justify-center transition-all ${occ?.status === 'PRONTO' ? 'bg-green-600 border-green-400' : occ ? 'bg-secondary border-secondary/50' : 'bg-white/5 border-white/10'}`}>
+                <button 
+                  key={num} 
+                  onClick={() => handleTableClick(num)} 
+                  className={`relative aspect-square rounded-[2rem] p-6 text-center border-2 flex flex-col items-center justify-center transition-all active:scale-95 ${
+                    occ?.status === 'PRONTO' 
+                      ? 'bg-green-600 border-green-400 shadow-lg shadow-green-900/20' 
+                      : occ 
+                      ? 'bg-secondary border-secondary/50 shadow-lg shadow-yellow-900/20' 
+                      : 'bg-white/5 border-white/10 hover:border-white/30'
+                  }`}
+                >
                   <Hash size={16} className="text-white/60 mb-1" />
-                  <span className="text-5xl font-bold text-white block">{num}</span>
-                  {occ && <div className="absolute top-3 right-3 bg-white/20 text-white text-[10px] px-2 py-0.5 rounded-full">{occ.count} itens</div>}
+                  <span className="text-5xl font-bold text-white block leading-none">{num}</span>
+                  {occ && (
+                    <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+                      <div className="bg-white/20 text-white text-[9px] px-2 py-0.5 rounded-full font-bold">R$ {occ.total.toFixed(2)}</div>
+                    </div>
+                  )}
                 </button>
               );
             })}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {activeOrders.map(order => (
-              <div key={order.id} className="bg-white rounded-[2rem] p-5 shadow-xl flex flex-col border border-gray-100">
+              <div key={order.id} className="bg-white rounded-[2.5rem] p-6 shadow-xl flex flex-col border border-gray-100 relative group">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <p className="text-[10px] font-black uppercase text-gray-400">{order.type} {order.tableNumber && `• Mesa ${order.tableNumber}`}</p>
-                    <h3 className="font-bold text-primary truncate">{order.customerName || `Pedido #${order.id.slice(-4)}`}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${order.type === 'MESA' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                            {order.type} {order.tableNumber && `• Mesa ${order.tableNumber}`}
+                        </span>
+                    </div>
+                    <h3 className="font-bold text-primary truncate text-lg">
+                        {order.customerName || `Pedido #${order.id.slice(-4)}`}
+                    </h3>
                   </div>
-                  <button onClick={() => handlePrint(order)} className="p-2 bg-gray-50 text-gray-400 rounded-xl hover:text-secondary"><Printer size={18} /></button>
+                  <button onClick={() => { setPrintOrder(order); setTimeout(() => window.print(), 300); }} className="p-2.5 bg-gray-50 text-gray-400 rounded-xl hover:text-secondary hover:bg-gray-100 transition-all">
+                    <Printer size={20} />
+                  </button>
                 </div>
-                <div className="flex-1 space-y-1 mb-4 border-t pt-3 min-h-[80px]">
+
+                <div className="flex-1 space-y-2 mb-5 border-t border-gray-50 pt-4 min-h-[100px] overflow-y-auto custom-scrollbar">
                   {order.items.map((it, i) => (
-                    <div key={i} className="flex justify-between text-xs font-medium text-gray-600"><span>{it.quantity}x {it.name}</span><span>R$ {(it.price * it.quantity).toFixed(2)}</span></div>
+                    <div key={i} className="flex justify-between text-xs font-bold text-zinc-600">
+                      <span className="truncate pr-2">
+                        <span className="bg-zinc-100 px-1.5 py-0.5 rounded mr-1.5">{it.quantity}x</span> {it.name}
+                      </span>
+                      <span className="shrink-0 text-zinc-400">R$ {(it.price * it.quantity).toFixed(2)}</span>
+                    </div>
                   ))}
                 </div>
-                <div className="flex flex-col gap-2 pt-3 border-t">
-                  <div className="flex justify-between items-center"><p className="text-xl font-bold text-primary">R$ {order.total.toFixed(2)}</p><span className="text-[9px] font-black px-2 py-1 bg-orange-100 text-orange-600 rounded-full">{order.status}</span></div>
+
+                <div className="flex flex-col gap-3 pt-4 border-t border-gray-50">
+                  <div className="flex justify-between items-center px-1">
+                    <p className="text-2xl font-brand font-bold text-primary">R$ {order.total.toFixed(2)}</p>
+                    <span className={`text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest ${order.status === 'PRONTO' ? 'bg-green-100 text-green-600 animate-pulse' : 'bg-orange-100 text-orange-600'}`}>
+                        {order.status}
+                    </span>
+                  </div>
                   <div className="flex gap-2">
-                    {order.status === 'PREPARANDO' && <button onClick={() => supabase.from('orders').update({ status: 'PRONTO' }).eq('id', order.id)} className="flex-1 py-3 bg-blue-500 text-white rounded-xl text-[10px] font-bold">PRONTO</button>}
-                    <button onClick={() => supabase.from('orders').update({ status: 'ENTREGUE' }).eq('id', order.id)} className="flex-1 py-3 bg-primary text-white rounded-xl text-[10px] font-bold">FINALIZAR</button>
+                    {order.status === 'PREPARANDO' && (
+                      <button 
+                        onClick={() => supabase.from('orders').update({ status: 'PRONTO' }).eq('id', order.id)} 
+                        className="flex-1 py-3.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+                      >
+                        MARCAR PRONTO
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => supabase.from('orders').update({ status: 'ENTREGUE' }).eq('id', order.id)} 
+                      className="flex-1 py-3.5 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+                    >
+                      FINALIZAR
+                    </button>
                   </div>
                 </div>
               </div>
             ))}
             {activeOrders.length === 0 && (
-              <div className="col-span-full py-20 text-center text-white/20 italic">
-                Nenhum pedido ativo no momento.
+              <div className="col-span-full py-24 text-center text-white/20 italic space-y-4">
+                <RefreshCw size={48} className="mx-auto opacity-20" />
+                <p>Nenhum pedido em aberto no momento.</p>
               </div>
             )}
           </div>
@@ -195,17 +287,54 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) =>
 
       {selectedTableModal && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-sm rounded-[3rem] overflow-hidden shadow-2xl animate-scale-up">
-            <div className="p-8 border-b bg-gray-50 text-center relative">
-              <button onClick={() => setSelectedTableModal(null)} className="absolute top-6 right-6 p-2 text-gray-300"><X size={24}/></button>
-              <div className="w-16 h-16 bg-primary text-secondary rounded-2xl flex items-center justify-center mx-auto mb-4"><Hash size={32} /></div>
+          <div className="bg-white w-full max-w-sm rounded-[3rem] overflow-hidden shadow-2xl animate-scale-up border border-orange-100">
+            <div className="p-8 border-b bg-orange-50/50 text-center relative">
+              <button onClick={() => setSelectedTableModal(null)} className="absolute top-6 right-6 p-2 text-gray-300 hover:text-gray-500 transition-colors">
+                <X size={24}/>
+              </button>
+              <div className="w-16 h-16 bg-primary text-secondary rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-xl shadow-black/10">
+                <Hash size={32} />
+              </div>
               <h2 className="text-2xl font-brand font-bold text-primary">Mesa {selectedTableModal}</h2>
+              <p className="text-[10px] font-black uppercase text-orange-400 tracking-widest mt-1">
+                Total acumulado: R$ {occupiedTables.get(selectedTableModal!)?.total.toFixed(2)}
+              </p>
             </div>
             <div className="p-8 space-y-3">
-              <button onClick={() => { onSelectTable(selectedTableModal); navigate('/cardapio'); }} className="w-full flex items-center gap-4 p-4 bg-orange-50 rounded-2xl border border-orange-100 font-bold text-sm hover:bg-orange-100 transition-all"><PlusCircle className="text-secondary" /> Adicionar Item</button>
-              <button onClick={() => updateTableOrders(selectedTableModal, 'PRONTO')} className="w-full flex items-center gap-4 p-4 bg-blue-50 rounded-2xl border border-blue-100 font-bold text-sm text-blue-700 hover:bg-blue-100 transition-all"><CheckCircle2 /> Marcar Tudo Pronto</button>
-              <button onClick={() => updateTableOrders(selectedTableModal, 'ENTREGUE')} className="w-full flex items-center gap-4 p-4 bg-green-50 rounded-2xl border border-green-100 font-bold text-sm text-green-700 hover:bg-green-100 transition-all"><CheckCircle /> Finalizar Conta</button>
-              <button onClick={() => updateTableOrders(selectedTableModal, 'CANCELADO')} className="w-full flex items-center gap-4 p-4 bg-red-50 rounded-2xl border border-red-100 font-bold text-sm text-red-700 hover:bg-red-100 transition-all"><XCircle /> Cancelar Pedidos</button>
+              <button 
+                onClick={() => { onSelectTable(selectedTableModal); navigate('/cardapio'); }} 
+                className="w-full flex items-center gap-4 p-5 bg-orange-50 rounded-2xl border border-orange-100 font-black text-[11px] uppercase tracking-wider text-orange-900 hover:bg-orange-100 transition-all active:scale-95"
+              >
+                <PlusCircle className="text-orange-500" size={20} /> Adicionar Item
+              </button>
+              
+              <button 
+                onClick={() => handlePrintConferencia(selectedTableModal!)} 
+                className="w-full flex items-center gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100 font-black text-[11px] uppercase tracking-wider text-gray-700 hover:bg-gray-100 transition-all active:scale-95"
+              >
+                <Printer className="text-gray-400" size={20} /> Imprimir Conferência
+              </button>
+
+              <button 
+                onClick={() => updateTableOrders(selectedTableModal!, 'PRONTO')} 
+                className="w-full flex items-center gap-4 p-5 bg-blue-50 rounded-2xl border border-blue-100 font-black text-[11px] uppercase tracking-wider text-blue-700 hover:bg-blue-100 transition-all active:scale-95"
+              >
+                <CheckCircle2 className="text-blue-500" size={20} /> Marcar Tudo Pronto
+              </button>
+              
+              <button 
+                onClick={() => updateTableOrders(selectedTableModal!, 'ENTREGUE')} 
+                className="w-full flex items-center gap-4 p-5 bg-green-50 rounded-2xl border border-green-100 font-black text-[11px] uppercase tracking-wider text-green-700 hover:bg-green-100 transition-all active:scale-95"
+              >
+                <CheckCircle className="text-green-500" size={20} /> Finalizar Conta
+              </button>
+
+              <button 
+                onClick={() => { if(window.confirm('Deseja realmente cancelar todos os pedidos desta mesa?')) updateTableOrders(selectedTableModal!, 'CANCELADO'); }} 
+                className="w-full flex items-center gap-4 p-5 bg-red-50 rounded-2xl border border-red-100 font-black text-[11px] uppercase tracking-wider text-red-700 hover:bg-red-100 transition-all active:scale-95"
+              >
+                <XCircle className="text-red-500" size={20} /> Cancelar Pedidos
+              </button>
             </div>
           </div>
         </div>
@@ -213,38 +342,71 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) =>
 
       {printOrder && (
         <div id="thermal-receipt-waiter">
-          <div style={{ textAlign: 'center' }}><p style={{ fontWeight: 'bold' }}>{settings.storeName.toUpperCase()}</p><p style={{ fontSize: '8pt' }}>{new Date().toLocaleString()}</p></div>
-          <div style={{ borderTop: '1px solid #000', margin: '2mm 0' }}></div>
-          <p style={{ fontWeight: 'bold' }}>{printOrder.tableNumber ? `MESA: ${printOrder.tableNumber}` : 'PEDIDO'}</p>
-          <table style={{ width: '100%', marginTop: '2mm' }}>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ fontWeight: 'bold', fontSize: '12pt' }}>{settings.storeName.toUpperCase()}</p>
+            <p style={{ fontSize: '8pt', margin: '1mm 0' }}>CONFERÊNCIA DE MESA</p>
+            <p style={{ fontSize: '7pt' }}>{new Date().toLocaleString()}</p>
+          </div>
+          <div style={{ borderTop: '1px solid #000', margin: '3mm 0' }}></div>
+          <p style={{ fontWeight: 'bold', fontSize: '11pt', textAlign: 'center' }}>{printOrder.tableNumber ? `MESA: ${printOrder.tableNumber}` : `PEDIDO: #${printOrder.id?.slice(-4)}`}</p>
+          <table style={{ width: '100%', marginTop: '3mm', borderCollapse: 'collapse' }}>
             <tbody>
               {printOrder.items.map((it: any, i: number) => (
-                <tr key={i}><td style={{ fontSize: '9pt' }}>{it.quantity}x {it.name}</td><td style={{ textAlign: 'right' }}>{(it.price * it.quantity).toFixed(2)}</td></tr>
+                <tr key={i} style={{ borderBottom: '1px dashed #eee' }}>
+                  <td style={{ fontSize: '9pt', padding: '1mm 0' }}>{it.quantity}x {it.name.toUpperCase()}</td>
+                  <td style={{ textAlign: 'right', fontSize: '9pt' }}>{(it.price * it.quantity).toFixed(2)}</td>
+                </tr>
               ))}
             </tbody>
           </table>
-          <div style={{ borderTop: '1px solid #000', marginTop: '2mm', textAlign: 'right' }}><p style={{ fontWeight: 'bold' }}>TOTAL: R$ {printOrder.total.toFixed(2)}</p></div>
+          <div style={{ borderTop: '1px solid #000', marginTop: '3mm', textAlign: 'right', paddingTop: '2mm' }}>
+            <p style={{ fontWeight: 'bold', fontSize: '11pt' }}>TOTAL: R$ {printOrder.total.toFixed(2)}</p>
+          </div>
+          <div style={{ marginTop: '5mm', textAlign: 'center', fontSize: '7pt' }}>
+            <p>ESTE DOCUMENTO NÃO É UM CUPOM FISCAL</p>
+          </div>
         </div>
       )}
 
       {showLogin && (
         <div className="fixed inset-0 z-[120] bg-primary flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 shadow-2xl space-y-8">
+          <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 shadow-2xl space-y-8 animate-scale-up">
             <div className="text-center">
-              <div className="w-16 h-16 bg-orange-500 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3"><UserRound size={32} /></div>
+              <div className="w-16 h-16 bg-orange-500 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3 shadow-lg shadow-orange-900/20">
+                <UserRound size={32} />
+              </div>
               <h1 className="text-2xl font-brand font-bold text-primary">Acesso Atendente</h1>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-2">Identifique-se para continuar</p>
             </div>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Nome de Usuário</label>
-                <input type="text" placeholder="Seu nome" value={loginName} onChange={e => setLoginName(e.target.value)} className="w-full px-4 py-4 bg-gray-50 border rounded-2xl outline-none focus:ring-2 focus:ring-secondary/20" required />
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Usuário</label>
+                <input 
+                    type="text" 
+                    placeholder="Seu nome" 
+                    value={loginName} 
+                    onChange={e => setLoginName(e.target.value)} 
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-secondary/20 transition-all font-bold" 
+                    required 
+                />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Senha de Acesso</label>
-                <input type="password" placeholder="••••" value={loginPass} onChange={e => setLoginPass(e.target.value)} className="w-full px-4 py-4 bg-gray-50 border rounded-2xl outline-none focus:ring-2 focus:ring-secondary/20" required />
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Senha</label>
+                <input 
+                    type="password" 
+                    placeholder="••••" 
+                    value={loginPass} 
+                    onChange={e => setLoginPass(e.target.value)} 
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-secondary/20 transition-all font-bold" 
+                    required 
+                />
               </div>
-              {loginError && <p className="text-xs text-red-500 font-bold text-center">{loginError}</p>}
-              <button disabled={isLogingIn} type="submit" className="w-full py-5 bg-primary text-white rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all">
+              {loginError && <p className="text-xs text-red-500 font-black text-center animate-shake">{loginError}</p>}
+              <button 
+                disabled={isLogingIn} 
+                type="submit" 
+                className="w-full py-5 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-black/20 flex items-center justify-center gap-2 active:scale-95 transition-all text-sm uppercase tracking-widest"
+              >
                 {isLogingIn ? <Loader2 className="animate-spin" size={20}/> : 'Entrar no Sistema'}
               </button>
             </form>

@@ -289,9 +289,10 @@ export default function App() {
           <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} />} />
           <Route path="equipe" element={<WaitstaffManagement settings={settings} onUpdateSettings={handleUpdateSettings} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} />} />
+          <Route path="atendimento" element={<AttendantPanel orders={orders} settings={settings} onSelectTable={setActiveTable} />} />
         </Route>
         <Route path="/cozinha" element={<KitchenBoard orders={orders} updateStatus={updateOrderStatus} />} />
-        <Route path="/atendimento" element={<AttendantPanel orders={orders} settings={settings} onSelectTable={setActiveTable} />} />
+        <Route path="/atendimento-painel" element={<AttendantPanel orders={orders} settings={settings} onSelectTable={setActiveTable} />} />
         <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!localStorage.getItem('vovo-guta-waitstaff')} />} />
         <Route path="/tv" element={<TVBoard orders={orders} settings={settings} products={products} />} />
         <Route path="*" element={<Navigate to="/cardapio" />} />
@@ -306,6 +307,7 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
     { to: '/', label: 'Início', icon: <LayoutDashboard size={20} /> },
     { to: '/pedidos', label: 'Pedidos', icon: <ShoppingCart size={20} /> },
     { to: '/cardapio-admin', label: 'Menu', icon: <PlusCircle size={20} /> },
+    { to: '/atendimento', label: 'Atendimento', icon: <UserRound size={20} /> },
     { to: '/equipe', label: 'Time', icon: <Users size={20} /> },
     { to: '/configuracoes', label: 'Ajustes', icon: <Settings size={20} /> },
   ];
