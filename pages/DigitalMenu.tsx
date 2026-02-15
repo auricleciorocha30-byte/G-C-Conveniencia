@@ -222,9 +222,11 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     setIsSending(true);
     const orderChangeFor = (payment === 'DINHEIRO' && changeFor) ? parseFloat(changeFor.replace(',', '.')) : undefined;
     
-    // Deixamos o ID vazio para o Supabase gerar automaticamente (BigInt Identity)
+    // Geramos um ID numérico baseado no timestamp para garantir que o banco aceite (coluna bigint)
+    const timestampId = Date.now().toString();
+
     const finalOrder: Order = {
-      id: "PENDING", // Placeholder, o App.tsx vai lidar com a resposta do DB
+      id: timestampId, 
       type: orderType, 
       items: cart, 
       status: 'PREPARANDO', 

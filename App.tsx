@@ -96,6 +96,7 @@ export default function App() {
     category: p.category,
     image_url: p.imageUrl,
     is_active: p.isActive,
+    // Corrected p.featured_day to p.featuredDay to match Product interface
     featured_day: p.featuredDay === undefined || p.featuredDay === -1 ? null : p.featuredDay,
     is_by_weight: p.isByWeight
   });
@@ -111,7 +112,7 @@ export default function App() {
     customerName: dbOrder.customer_name,
     customerPhone: dbOrder.customer_phone,
     deliveryAddress: dbOrder.delivery_address,
-    paymentMethod: dbOrder.payment_method,
+    payment_method: dbOrder.payment_method,
     notes: dbOrder.notes,
     changeFor: dbOrder.change_for ? Number(dbOrder.change_for) : undefined,
     waitstaffName: dbOrder.waitstaff_name,
@@ -120,25 +121,29 @@ export default function App() {
     isSynced: true
   });
 
-  const mapOrderToDb = (order: Order) => ({
-    type: order.type,
-    items: order.items,
-    status: order.status,
-    total: order.total,
-    // Se o banco for int8/bigint, enviamos o número. Se for timestamptz, Postgres converte o número ou ISO String.
-    // Para evitar erro de sintaxe BigInt, enviamos o número puro do Date.now()
-    created_at: order.createdAt, 
-    notes: order.notes,
-    table_number: order.tableNumber,
-    customer_name: order.customerName,
-    customer_phone: order.customerPhone,
-    delivery_address: order.deliveryAddress,
-    payment_method: order.paymentMethod,
-    waitstaff_name: order.waitstaffName,
-    change_for: order.changeFor,
-    coupon_applied: order.couponApplied,
-    discount_amount: order.discountAmount
-  });
+  const mapOrderToDb = (order: Order) => {
+    // Garante que o ID seja numérico se possível para evitar erros de bigint
+    const numericId = !isNaN(Number(order.id)) ? Number(order.id) : Date.now();
+    
+    return {
+      id: numericId, // Adicionado ID explicitamente para evitar erro de not-null
+      type: order.type,
+      items: order.items,
+      status: order.status,
+      total: order.total,
+      created_at: order.createdAt, 
+      notes: order.notes,
+      table_number: order.tableNumber,
+      customer_name: order.customerName,
+      customer_phone: order.customerPhone,
+      delivery_address: order.deliveryAddress,
+      payment_method: order.paymentMethod,
+      waitstaff_name: order.waitstaffName,
+      change_for: order.changeFor,
+      coupon_applied: order.couponApplied,
+      discount_amount: order.discountAmount
+    };
+  };
 
   useEffect(() => {
     const restoreSession = async () => {
