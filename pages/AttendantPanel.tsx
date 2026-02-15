@@ -24,9 +24,10 @@ interface Props {
   onSelectTable: (table: string | null) => void;
   orders: Order[];
   settings: StoreSettings;
+  updateStatus: (id: string, status: OrderStatus) => Promise<void>;
 }
 
-const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) => {
+const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings, updateStatus }) => {
   const navigate = useNavigate();
   const [activeWaitstaff, setActiveWaitstaff] = useState<Waitstaff | null>(null);
   const [showLogin, setShowLogin] = useState(false);
@@ -37,6 +38,7 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) =>
   const [selectedTableModal, setSelectedTableModal] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'MAPA' | 'PEDIDOS'>('MAPA');
   const [printOrder, setPrintOrder] = useState<any | null>(null);
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
   
   const tables = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
 
@@ -132,8 +134,22 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) =>
 
   const updateTableOrders = async (tableNum: string, status: OrderStatus) => {
     const tableOrders = activeOrders.filter(o => o.tableNumber === tableNum);
-    await Promise.all(tableOrders.map(o => supabase.from('orders').update({ status }).eq('id', o.id)));
-    setSelectedTableModal(null);
+    setIsUpdating(`table-${tableNum}`);
+    try {
+        await Promise.all(tableOrders.map(o => updateStatus(o.id, status)));
+        setSelectedTableModal(null);
+    } finally {
+        setIsUpdating(null);
+    }
+  };
+
+  const handleIndividualStatusUpdate = async (id: string, status: OrderStatus) => {
+    setIsUpdating(id);
+    try {
+        await updateStatus(id, status);
+    } finally {
+        setIsUpdating(null);
+    }
   };
 
   return (
@@ -259,17 +275,19 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) =>
                   <div className="flex gap-2">
                     {order.status === 'PREPARANDO' && (
                       <button 
-                        onClick={() => supabase.from('orders').update({ status: 'PRONTO' }).eq('id', order.id)} 
-                        className="flex-1 py-3.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+                        disabled={isUpdating === order.id}
+                        onClick={() => handleIndividualStatusUpdate(order.id, 'PRONTO')} 
+                        className="flex-1 py-3.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                       >
-                        MARCAR PRONTO
+                        {isUpdating === order.id ? <Loader2 className="animate-spin" size={14} /> : 'MARCAR PRONTO'}
                       </button>
                     )}
                     <button 
-                      onClick={() => supabase.from('orders').update({ status: 'ENTREGUE' }).eq('id', order.id)} 
-                      className="flex-1 py-3.5 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+                      disabled={isUpdating === order.id}
+                      onClick={() => handleIndividualStatusUpdate(order.id, 'ENTREGUE')} 
+                      className="flex-1 py-3.5 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
-                      FINALIZAR
+                      {isUpdating === order.id ? <Loader2 className="animate-spin" size={14} /> : 'FINALIZAR'}
                     </button>
                   </div>
                 </div>
@@ -316,24 +334,27 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) =>
               </button>
 
               <button 
+                disabled={isUpdating === `table-${selectedTableModal}`}
                 onClick={() => updateTableOrders(selectedTableModal!, 'PRONTO')} 
                 className="w-full flex items-center gap-4 p-5 bg-blue-50 rounded-2xl border border-blue-100 font-black text-[11px] uppercase tracking-wider text-blue-700 hover:bg-blue-100 transition-all active:scale-95"
               >
-                <CheckCircle2 className="text-blue-500" size={20} /> Marcar Tudo Pronto
+                {isUpdating === `table-${selectedTableModal}` ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 className="text-blue-500" size={20} />} Marcar Tudo Pronto
               </button>
               
               <button 
+                disabled={isUpdating === `table-${selectedTableModal}`}
                 onClick={() => updateTableOrders(selectedTableModal!, 'ENTREGUE')} 
                 className="w-full flex items-center gap-4 p-5 bg-green-50 rounded-2xl border border-green-100 font-black text-[11px] uppercase tracking-wider text-green-700 hover:bg-green-100 transition-all active:scale-95"
               >
-                <CheckCircle className="text-green-500" size={20} /> Finalizar Conta
+                {isUpdating === `table-${selectedTableModal}` ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle className="text-green-500" size={20} />} Finalizar Conta
               </button>
 
               <button 
+                disabled={isUpdating === `table-${selectedTableModal}`}
                 onClick={() => { if(window.confirm('Deseja realmente cancelar todos os pedidos desta mesa?')) updateTableOrders(selectedTableModal!, 'CANCELADO'); }} 
                 className="w-full flex items-center gap-4 p-5 bg-red-50 rounded-2xl border border-red-100 font-black text-[11px] uppercase tracking-wider text-red-700 hover:bg-red-100 transition-all active:scale-95"
               >
-                <XCircle className="text-red-500" size={20} /> Cancelar Pedidos
+                {isUpdating === `table-${selectedTableModal}` ? <Loader2 className="animate-spin" size={20} /> : <XCircle className="text-red-500" size={20} />} Cancelar Pedidos
               </button>
             </div>
           </div>

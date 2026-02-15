@@ -217,11 +217,14 @@ export default function App() {
         const updated = mapOrderFromDb(payload.new);
         setOrders(prev => {
           const old = prev.find(o => o.id === updated.id);
-          if (old?.status !== 'PRONTO' && updated.status === 'PRONTO') {
+          if (old && old.status !== 'PRONTO' && updated.status === 'PRONTO') {
             if (!initialLoadRef.current) playAudio(SOUNDS.ORDER_READY);
           }
           return prev.map(o => o.id === updated.id ? updated : o);
         });
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, (payload) => {
+        setOrders(prev => prev.filter(o => o.id !== payload.old.id.toString()));
       })
       .subscribe();
 
@@ -266,7 +269,14 @@ export default function App() {
   };
 
   const updateOrderStatus = async (id: string, status: OrderStatus) => {
-    await supabase.from('orders').update({ status }).eq('id', id);
+    // Atualização otimista no estado local
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+    
+    const { error } = await supabase.from('orders').update({ status }).eq('id', id);
+    if (error) {
+        console.error("Erro ao atualizar status:", error);
+        // Se falhar, poderíamos reverter, mas o Realtime deve corrigir
+    }
   };
 
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
@@ -290,7 +300,7 @@ export default function App() {
           <Route path="equipe" element={<WaitstaffManagement settings={settings} onUpdateSettings={handleUpdateSettings} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} />} />
         </Route>
-        <Route path="/atendimento" element={<AttendantPanel orders={orders} settings={settings} onSelectTable={setActiveTable} />} />
+        <Route path="/atendimento" element={<AttendantPanel orders={orders} settings={settings} onSelectTable={setActiveTable} updateStatus={updateOrderStatus} />} />
         <Route path="/cozinha" element={<KitchenBoard orders={orders} updateStatus={updateOrderStatus} />} />
         <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!localStorage.getItem('vovo-guta-waitstaff')} />} />
         <Route path="/tv" element={<TVBoard orders={orders} settings={settings} products={products} />} />
