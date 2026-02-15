@@ -125,6 +125,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     }
     
     if (isWaitstaff) {
+      onLogout(); // Limpa a mesa selecionada no App.tsx
       navigate('/atendimento');
       return;
     }
@@ -201,19 +202,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     });
   };
 
-  const handleApplyCoupon = () => {
-    if (!settings.isCouponActive) {
-      alert("Nenhum cupom ativo no momento.");
-      return;
-    }
-    if (couponCode.toUpperCase() === settings.couponName?.toUpperCase()) {
-      setAppliedCoupon({ code: settings.couponName || '', discount: settings.couponDiscount || 0 });
-      alert(`Cupom ${settings.couponName} aplicado com sucesso!`);
-    } else {
-      alert("Cupom inválido.");
-    }
-  };
-
   const { subtotal, discountAmount, cartTotal } = useMemo(() => {
     const sub = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     let disc = 0;
@@ -285,7 +273,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       <div className="min-h-screen bg-primary flex items-center justify-center p-6 text-zinc-900">
         <div className="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl space-y-10 border border-orange-100 animate-scale-up relative overflow-hidden">
           <div className="absolute -top-10 -right-10 w-32 h-32 bg-secondary opacity-10 rounded-full blur-3xl"></div>
-          
           <div className="text-center relative z-10">
             <div className="relative inline-block mb-6">
                 <img src={settings.logoUrl} className="w-24 h-24 rounded-full border-4 border-orange-50 object-cover shadow-2xl" alt="Logo" />
@@ -298,7 +285,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
               {isStoreClosed ? 'ESTAMOS FECHADOS NO MOMENTO' : 'Como deseja fazer seu pedido?'}
             </p>
           </div>
-          
           {isStoreClosed ? (
             <div className="bg-red-50 p-8 rounded-[2rem] border border-red-100 text-center space-y-4">
                <Power size={56} className="text-red-300 mx-auto" strokeWidth={1.5} />
@@ -461,6 +447,53 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
           ))}
         </div>
       </main>
+
+      {/* Modal de Informações da Loja */}
+      {isInfoOpen && (
+        <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl animate-scale-up overflow-hidden border border-orange-100">
+            <div className="p-8 border-b bg-orange-50 text-center relative">
+               <button onClick={() => setIsInfoOpen(false)} className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-600">
+                  <X size={24} />
+               </button>
+               <img src={settings.logoUrl} className="w-20 h-20 rounded-full border-4 border-white shadow-xl mx-auto mb-4 object-cover" />
+               <h2 className="text-xl font-brand font-bold text-primary">{settings.storeName}</h2>
+               <div className={`inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase mt-2 tracking-widest ${settings.isStoreOpen ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                  {settings.isStoreOpen ? 'Aberto Agora' : 'Fechado no Momento'}
+               </div>
+            </div>
+            <div className="p-8 space-y-6">
+               {settings.address && (
+                 <div className="flex items-start gap-4">
+                    <div className="p-3 bg-gray-50 rounded-2xl text-primary border border-gray-100"><MapPin size={20} /></div>
+                    <div className="min-w-0">
+                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Localização</p>
+                       <p className="text-sm font-bold text-gray-700 leading-snug">{settings.address}</p>
+                       <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(settings.address)}`} target="_blank" className="text-[10px] font-black text-secondary flex items-center gap-1 mt-1">
+                          VER NO MAPA <Navigation size={10} />
+                       </a>
+                    </div>
+                 </div>
+               )}
+               {settings.whatsapp && (
+                 <div className="flex items-start gap-4">
+                    <div className="p-3 bg-gray-50 rounded-2xl text-green-600 border border-gray-100"><Phone size={20} /></div>
+                    <div className="min-w-0">
+                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">WhatsApp</p>
+                       <p className="text-sm font-bold text-gray-700 leading-snug">{settings.whatsapp}</p>
+                       <a href={`https://wa.me/${settings.whatsapp.replace(/\D/g, '')}`} target="_blank" className="text-[10px] font-black text-green-600 flex items-center gap-1 mt-1">
+                          INICIAR CONVERSA <MessageCircle size={10} />
+                       </a>
+                    </div>
+                 </div>
+               )}
+               <button onClick={() => setIsInfoOpen(false)} className="w-full py-4 bg-primary text-white rounded-2xl font-bold shadow-xl active:scale-95 transition-all text-xs uppercase tracking-widest mt-4">
+                  Fechar
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Seleção de Peso */}
       {weightProduct && (
