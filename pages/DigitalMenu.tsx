@@ -27,7 +27,9 @@ import {
   Phone,
   Navigation,
   ArrowRight,
-  ShieldCheck
+  ShieldCheck,
+  Tag,
+  Check
 } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff } from '../types';
 
@@ -203,22 +205,43 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     });
   };
 
-  const { subtotal, discountAmount, cartTotal } = useMemo(() => {
+  const { subtotal, discountAmount, cartTotal, isAnyItemEligibleForCoupon } = useMemo(() => {
     const sub = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     let disc = 0;
+    
+    const eligibleIds = settings.applicableProductIds || [];
+    const eligibleItems = cart.filter(item => settings.isCouponForAllProducts || eligibleIds.includes(item.productId));
+    const anyEligible = eligibleItems.length > 0;
+
     if (appliedCoupon) {
       if (settings.isCouponForAllProducts !== false) {
         disc = sub * (appliedCoupon.discount / 100);
       } else {
-        const eligibleIds = settings.applicableProductIds || [];
         const eligibleSubtotal = cart.reduce((acc, item) => {
            return eligibleIds.includes(item.productId) ? acc + (item.price * item.quantity) : acc;
         }, 0);
         disc = eligibleSubtotal * (appliedCoupon.discount / 100);
       }
     }
-    return { subtotal: sub, discountAmount: disc, cartTotal: Math.max(0, sub - disc) };
+    return { subtotal: sub, discountAmount: disc, cartTotal: Math.max(0, sub - disc), isAnyItemEligibleForCoupon: anyEligible };
   }, [cart, appliedCoupon, settings]);
+
+  const handleApplyCoupon = () => {
+    if (!couponCode.trim()) return;
+    
+    if (settings.isCouponActive && couponCode.toUpperCase() === settings.couponName?.toUpperCase()) {
+      if (settings.isCouponForAllProducts === false) {
+        if (!isAnyItemEligibleForCoupon) {
+          alert("Este cupom não é válido para nenhum dos produtos selecionados.");
+          return;
+        }
+      }
+      setAppliedCoupon({ code: settings.couponName!, discount: settings.couponDiscount || 0 });
+      setCouponCode('');
+    } else {
+      alert("Cupom inválido ou expirado.");
+    }
+  };
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
@@ -339,7 +362,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   }
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-orange-50/40 text-primary relative flex flex-col font-sans">
+    <div className="min-h-screen w-full overflow-x-hidden bg-orange-50/40 text-primary relative flex flex-col font-sans text-zinc-900">
       <header className={`sticky top-0 z-30 shadow-md ${isWaitstaff ? 'bg-secondary' : 'bg-primary'} text-white p-3 md:p-4 transition-all w-full`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
@@ -453,7 +476,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       {isInfoOpen && (
         <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl animate-scale-up overflow-hidden border border-orange-100">
-            <div className="p-8 border-b bg-orange-50 text-center relative">
+            <div className="p-8 border-b bg-orange-50 text-center relative text-zinc-900">
                <button onClick={() => setIsInfoOpen(false)} className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-600">
                   <X size={24} />
                </button>
@@ -509,7 +532,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       {weightProduct && (
         <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl animate-scale-up overflow-hidden border border-orange-100">
-            <div className="p-8 border-b bg-orange-50 text-center">
+            <div className="p-8 border-b bg-orange-50 text-center text-zinc-900">
               <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm border border-orange-100 text-orange-500">
                 <Scale size={32} />
               </div>
@@ -526,7 +549,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                     placeholder="Ex: 250" 
                     value={selectedWeightGrams} 
                     onChange={e => setSelectedWeightGrams(e.target.value)}
-                    className="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-black text-2xl text-center focus:ring-2 focus:ring-orange-200 transition-all"
+                    className="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-black text-2xl text-center focus:ring-2 focus:ring-orange-200 transition-all text-zinc-900"
                   />
                   <span className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-300 font-bold">g</span>
                 </div>
@@ -556,7 +579,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
       {isCartOpen && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center">
-          <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-slide-up">
+          <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-slide-up text-zinc-900">
             <div className="px-5 py-5 border-b flex items-center justify-between bg-gray-50 shrink-0">
               <div className="flex items-center gap-2">
                 <ShoppingBag size={18} className="text-primary" />
@@ -575,21 +598,65 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                           <p className="italic text-xs font-medium">Sacola vazia...</p>
                       </div>
                     ) : (
-                      cart.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl border border-gray-100 shadow-sm">
-                          <div className="flex-1 mr-3 min-w-0">
-                              <p className="font-bold text-[11px] truncate leading-tight text-zinc-800">{item.name}</p>
-                              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter mt-1">
-                                {item.isByWeight ? `${item.quantity.toFixed(3).replace('.', ',')}kg` : `${item.quantity}x`} • R$ {(item.price * item.quantity).toFixed(2)}
-                              </p>
+                      <>
+                        {cart.map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl border border-gray-100 shadow-sm">
+                            <div className="flex-1 mr-3 min-w-0">
+                                <p className="font-bold text-[11px] truncate leading-tight text-zinc-800">{item.name}</p>
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter mt-1">
+                                  {item.isByWeight ? `${item.quantity.toFixed(3).replace('.', ',')}kg` : `${item.quantity}x`} • R$ {(item.price * item.quantity).toFixed(2)}
+                                </p>
+                            </div>
+                            <div className="flex items-center bg-white rounded-xl border border-gray-100 p-0.5 shadow-sm">
+                                <button onClick={() => updateCartItemQuantity(item.productId, -1)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"><MinusIcon size={14} /></button>
+                                <span className="w-16 text-center text-[10px] font-black">{item.isByWeight ? `${item.quantity.toFixed(3).replace('.', ',')}kg` : item.quantity}</span>
+                                <button onClick={() => updateCartItemQuantity(item.productId, 1)} className="p-1.5 text-gray-400 hover:text-green-500 transition-colors"><PlusIcon size={14} /></button>
+                            </div>
                           </div>
-                          <div className="flex items-center bg-white rounded-xl border border-gray-100 p-0.5 shadow-sm">
-                              <button onClick={() => updateCartItemQuantity(item.productId, -1)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"><MinusIcon size={14} /></button>
-                              <span className="w-16 text-center text-[10px] font-black">{item.isByWeight ? `${item.quantity.toFixed(3).replace('.', ',')}kg` : item.quantity}</span>
-                              <button onClick={() => updateCartItemQuantity(item.productId, 1)} className="p-1.5 text-gray-400 hover:text-green-500 transition-colors"><PlusIcon size={14} /></button>
+                        ))}
+
+                        {/* SEÇÃO DE CUPOM */}
+                        {settings.isCouponActive && (settings.isCouponForAllProducts || isAnyItemEligibleForCoupon) && (
+                          <div className="mt-4 p-4 bg-orange-50/50 rounded-2xl border-2 border-dashed border-orange-200 animate-fade-in">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Ticket className="text-orange-500" size={16} />
+                              <span className="text-[10px] font-black uppercase text-orange-600 tracking-widest">Cupom de Desconto</span>
+                            </div>
+                            
+                            {appliedCoupon ? (
+                              <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-orange-200 shadow-sm">
+                                <div className="flex items-center gap-2">
+                                  <Check className="text-green-500" size={16} />
+                                  <div>
+                                    <p className="text-[10px] font-black uppercase text-primary leading-none">{appliedCoupon.code}</p>
+                                    <p className="text-[8px] font-bold text-green-600 uppercase mt-1">CUPOM APLICADO COM SUCESSO</p>
+                                  </div>
+                                </div>
+                                <button onClick={() => setAppliedCoupon(null)} className="text-[10px] font-black text-red-400 uppercase tracking-widest hover:text-red-600">Remover</button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                  <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
+                                  <input 
+                                    type="text" 
+                                    placeholder="DIGITE O CÓDIGO" 
+                                    value={couponCode}
+                                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                                    className="w-full pl-9 pr-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-[11px] font-bold focus:ring-2 focus:ring-orange-300 transition-all uppercase"
+                                  />
+                                </div>
+                                <button 
+                                  onClick={handleApplyCoupon}
+                                  className="px-5 py-3 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-all shadow-md"
+                                >
+                                  APLICAR
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
