@@ -78,7 +78,6 @@ export default function App() {
     document.documentElement.style.setProperty('--secondary-color', s.secondaryColor || '#FFD700');
   }, []);
 
-  // Mapeadores
   const mapProductFromDb = (p: any): Product => ({
     id: p.id,
     name: p.name,
@@ -113,6 +112,8 @@ export default function App() {
     paymentMethod: dbOrder.payment_method,
     waitstaffName: dbOrder.waitstaff_name,
     changeFor: dbOrder.change_for,
+    couponApplied: dbOrder.coupon_applied,
+    discountAmount: dbOrder.discount_amount,
     isSynced: true
   });
 
@@ -135,7 +136,6 @@ export default function App() {
     discount_amount: order.discountAmount
   });
 
-  // RESTAURAÇÃO DA SESSÃO ADMIN
   useEffect(() => {
     const restoreSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -165,7 +165,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // CARREGAMENTO DE DADOS
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -195,7 +194,6 @@ export default function App() {
     };
     fetchData();
 
-    // REALTIME
     const channel = supabase.channel('gc-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
@@ -249,7 +247,8 @@ export default function App() {
 
   const addOrder = async (order: Order) => {
     setOrders(prev => [order, ...prev]);
-    await supabase.from('orders').insert([mapOrderToDb(order)]);
+    const { error } = await supabase.from('orders').insert([mapOrderToDb(order)]);
+    if (error) console.error("Erro ao salvar pedido:", error);
   };
 
   const handleSaveProduct = async (p: Product) => {
