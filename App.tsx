@@ -67,12 +67,12 @@ export default function App() {
   const [activeTable, setActiveTable] = useState<string | null>(null);
   const [isWaitstaff, setIsWaitstaff] = useState(() => !!localStorage.getItem('vovo-guta-waitstaff'));
 
-  // Ref para evitar tocar som no carregamento inicial
   const initialLoadRef = useRef(true);
 
   const playAudio = (url: string) => {
     const audio = new Audio(url);
-    audio.play().catch(e => console.warn('Bloqueio de áudio do navegador:', e));
+    audio.crossOrigin = "anonymous";
+    audio.play().catch(e => console.warn('Erro ao reproduzir som:', e));
   };
 
   const applyColors = useCallback((s: StoreSettings) => {
@@ -83,6 +83,30 @@ export default function App() {
   useEffect(() => {
     applyColors(settings);
   }, [settings, applyColors]);
+
+  const mapProductFromDb = (p: any): Product => ({
+    id: p.id,
+    name: p.name,
+    description: p.description || '',
+    price: Number(p.price),
+    category: p.category,
+    imageUrl: p.image_url || '',
+    isActive: p.is_active ?? true,
+    featuredDay: p.featured_day === null ? undefined : p.featured_day,
+    isByWeight: p.is_by_weight ?? false
+  });
+
+  const mapProductToDb = (p: Product) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price: p.price,
+    category: p.category,
+    image_url: p.imageUrl,
+    is_active: p.isActive,
+    featured_day: p.featuredDay === undefined || p.featuredDay === -1 ? null : p.featuredDay,
+    is_by_weight: p.isByWeight
+  });
 
   const mapOrderFromDb = (dbOrder: any): Order => {
     let changeForValue = dbOrder.change_for;
@@ -103,30 +127,6 @@ export default function App() {
       isSynced: true
     };
   };
-
-  const mapProductFromDb = (p: any): Product => ({
-    id: p.id,
-    name: p.name,
-    description: p.description || '',
-    price: Number(p.price),
-    category: p.category,
-    imageUrl: p.image_url || '',
-    isActive: p.is_active ?? true,
-    featuredDay: p.featured_day,
-    isByWeight: p.is_by_weight ?? false
-  });
-
-  const mapProductToDb = (p: Product) => ({
-    id: p.id,
-    name: p.name,
-    description: p.description,
-    price: p.price,
-    category: p.category,
-    image_url: p.imageUrl,
-    is_active: p.isActive,
-    featured_day: p.featuredDay,
-    is_by_weight: p.isByWeight
-  });
 
   const mapOrderToDb = (order: Order) => ({
     id: order.id,
@@ -149,7 +149,8 @@ export default function App() {
 
   // RESTAURAÇÃO DA SESSÃO AO REFRESH
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setAdminUser({
           id: session.user.id,
@@ -158,7 +159,9 @@ export default function App() {
         });
       }
       setAuthLoading(false);
-    });
+    };
+
+    checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
@@ -175,98 +178,40 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const addOrder = async (order: Order) => {
-    const orderToSave = { ...order, isSynced: isOnline };
-    setOrders(prev => [orderToSave, ...prev]);
-
-    if (!isOnline) {
-      const offline = localStorage.getItem(CACHE_KEYS.OFFLINE_ORDERS);
-      const queue = offline ? JSON.parse(offline) : [];
-      localStorage.setItem(CACHE_KEYS.OFFLINE_ORDERS, JSON.stringify([...queue, orderToSave]));
-      return;
-    }
-
+  const fetchInitialData = async () => {
     try {
-      const { error } = await supabase.from('orders').insert([mapOrderToDb(order)]);
-      if (error) throw error;
+      const [pRes, cRes, oRes, sRes] = await Promise.all([
+        supabase.from('products').select('*').order('name'),
+        supabase.from('categories').select('*').order('name'),
+        supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase.from('settings').select('data').eq('id', 'store').maybeSingle()
+      ]);
+
+      if (pRes.data) {
+        const mappedProducts = pRes.data.map(mapProductFromDb);
+        setProducts(mappedProducts);
+        localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(mappedProducts));
+      }
+      
+      if (cRes.data) setCategories(cRes.data.map((c: any) => c.name));
+      if (oRes.data) setOrders(oRes.data.map(mapOrderFromDb));
+      
+      if (sRes.data && sRes.data.data) {
+        setSettings(sRes.data.data);
+        localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(sRes.data.data));
+        applyColors(sRes.data.data);
+      }
+      initialLoadRef.current = false;
     } catch (err) {
-      const offline = localStorage.getItem(CACHE_KEYS.OFFLINE_ORDERS);
-      const queue = offline ? JSON.parse(offline) : [];
-      localStorage.setItem(CACHE_KEYS.OFFLINE_ORDERS, JSON.stringify([...queue, orderToSave]));
+      console.warn('Operando em modo Offline (Dados do Cache)');
     }
   };
 
-  const syncOfflineOrders = useCallback(async () => {
-    if (!navigator.onLine || syncing) return;
-    const offline = localStorage.getItem(CACHE_KEYS.OFFLINE_ORDERS);
-    if (!offline) return;
-
-    const queue: Order[] = JSON.parse(offline);
-    if (queue.length === 0) return;
-
-    setSyncing(true);
-    const successfullySynced: string[] = [];
-
-    for (const order of queue) {
-      try {
-        const { error } = await supabase.from('orders').insert([mapOrderToDb(order)]);
-        if (!error) successfullySynced.push(order.id);
-      } catch (e) {}
-    }
-
-    const remaining = queue.filter(o => !successfullySynced.includes(o.id));
-    localStorage.setItem(CACHE_KEYS.OFFLINE_ORDERS, JSON.stringify(remaining));
-    setSyncing(false);
-  }, [syncing]);
-
   useEffect(() => {
-    const handleStatusChange = () => {
-      setIsOnline(navigator.onLine);
-      if (navigator.onLine) syncOfflineOrders();
-    };
-    window.addEventListener('online', handleStatusChange);
-    window.addEventListener('offline', handleStatusChange);
-    return () => {
-      window.removeEventListener('online', handleStatusChange);
-      window.removeEventListener('offline', handleStatusChange);
-    };
-  }, [syncOfflineOrders]);
-
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        const [pRes, cRes, oRes, sRes] = await Promise.all([
-          supabase.from('products').select('*').order('name'),
-          supabase.from('categories').select('*').order('name'),
-          supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100),
-          supabase.from('settings').select('data').eq('id', 'store').maybeSingle()
-        ]);
-
-        if (pRes.data) {
-          const mappedProducts = pRes.data.map(mapProductFromDb);
-          setProducts(mappedProducts);
-          localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(mappedProducts));
-        }
-        
-        if (cRes.data) setCategories(cRes.data.map((c: any) => c.name));
-        if (oRes.data) setOrders(oRes.data.map(mapOrderFromDb));
-        
-        if (sRes.data && sRes.data.data) {
-          const loadedSettings = sRes.data.data;
-          setSettings(loadedSettings);
-          localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(loadedSettings));
-          applyColors(loadedSettings);
-        }
-        initialLoadRef.current = false;
-      } catch (err) {
-        console.warn('Operando em modo Offline (Dados do Cache)');
-      }
-    };
-
     fetchInitialData();
 
     const channel = supabase
-      .channel('vovo-guta-sync-v2')
+      .channel('vovo-guta-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const newOrder = mapOrderFromDb(payload.new);
@@ -280,9 +225,28 @@ export default function App() {
           setOrders(prev => {
             const oldOrder = prev.find(o => o.id === updated.id);
             if (oldOrder?.status !== 'PRONTO' && updated.status === 'PRONTO') {
-                if (!initialLoadRef.current) playAudio(SOUNDS.ORDER_READY);
+              if (!initialLoadRef.current) playAudio(SOUNDS.ORDER_READY);
             }
             return prev.map(o => o.id === updated.id ? updated : o);
+          });
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const updatedProduct = mapProductFromDb(payload.new);
+          setProducts(prev => {
+            const exists = prev.some(p => p.id === updatedProduct.id);
+            const newList = exists 
+              ? prev.map(p => p.id === updatedProduct.id ? updatedProduct : p)
+              : [...prev, updatedProduct];
+            localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(newList));
+            return newList;
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setProducts(prev => {
+            const newList = prev.filter(p => p.id !== payload.old.id);
+            localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(newList));
+            return newList;
           });
         }
       })
@@ -298,22 +262,51 @@ export default function App() {
     return () => { supabase.removeChannel(channel); };
   }, [applyColors]);
 
-  const updateOrderStatus = async (id: string, status: Order['status']) => {
-    const { error } = await supabase.from('orders').update({ status }).eq('id', id);
+  const addOrder = async (order: Order) => {
+    setOrders(prev => [order, ...prev]);
+    if (!isOnline) {
+      const offline = localStorage.getItem(CACHE_KEYS.OFFLINE_ORDERS);
+      const queue = offline ? JSON.parse(offline) : [];
+      localStorage.setItem(CACHE_KEYS.OFFLINE_ORDERS, JSON.stringify([...queue, order]));
+      return;
+    }
+    await supabase.from('orders').insert([mapOrderToDb(order)]);
+  };
+
+  const handleSaveProduct = async (p: Product) => {
+    const payload = mapProductToDb(p);
+    const { error } = await supabase.from('products').upsert([payload]);
     if (error) throw error;
+    
+    // Atualização otimista/local
+    setProducts(prev => {
+      const exists = prev.some(item => item.id === p.id);
+      const next = exists ? prev.map(item => item.id === p.id ? p : item) : [...prev, p];
+      localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) throw error;
+    setProducts(prev => {
+      const next = prev.filter(p => p.id !== id);
+      localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const updateOrderStatus = async (id: string, status: Order['status']) => {
+    await supabase.from('orders').update({ status }).eq('id', id);
   };
 
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
-    try {
-      const { error } = await supabase.from('settings').upsert({ id: 'store', data: newSettings });
-      if (error) throw error;
-      setSettings(newSettings);
-      localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(newSettings));
-      applyColors(newSettings);
-    } catch (err) {
-      console.error('Erro ao atualizar settings:', err);
-      throw err;
-    }
+    const { error } = await supabase.from('settings').upsert({ id: 'store', data: newSettings });
+    if (error) throw error;
+    setSettings(newSettings);
+    localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(newSettings));
+    applyColors(newSettings);
   };
 
   const handleLogoutAdmin = async () => {
@@ -336,11 +329,6 @@ export default function App() {
           <WifiOff size={14} /> Modo Offline
         </div>
       )}
-      {syncing && (
-        <div className="fixed top-20 right-4 z-[100] bg-blue-600 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase flex items-center gap-2 shadow-2xl">
-          <RefreshCw size={14} className="animate-spin" /> Sincronizando...
-        </div>
-      )}
 
       <Routes>
         <Route path="/login" element={adminUser ? <Navigate to="/" /> : <LoginPage onLoginSuccess={setAdminUser} />} />
@@ -349,13 +337,8 @@ export default function App() {
           <Route index element={<AdminDashboard orders={orders} products={products} settings={settings} />} />
           <Route path="cardapio-admin" element={<MenuManagement 
             products={products} 
-            saveProduct={async (p) => { 
-                const { error } = await supabase.from('products').upsert([mapProductToDb(p)]);
-                if (error) throw error;
-            }} 
-            deleteProduct={async (id) => { 
-                await supabase.from('products').delete().eq('id', id); 
-            }} 
+            saveProduct={handleSaveProduct} 
+            deleteProduct={handleDeleteProduct} 
             categories={categories} 
             setCategories={setCategories} 
           />} />
