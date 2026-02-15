@@ -62,7 +62,6 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [adminUser, setAdminUser] = useState<Waitstaff | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [activeTable, setActiveTable] = useState<string | null>(null);
 
   const initialLoadRef = useRef(true);
@@ -103,17 +102,22 @@ export default function App() {
   });
 
   const mapOrderFromDb = (dbOrder: any): Order => ({
-    ...dbOrder,
+    id: dbOrder.id,
+    type: dbOrder.type,
+    items: dbOrder.items,
+    status: dbOrder.status,
+    total: Number(dbOrder.total),
     createdAt: dbOrder.created_at ? new Date(dbOrder.created_at).getTime() : Date.now(),
     tableNumber: dbOrder.table_number,
     customerName: dbOrder.customer_name,
     customerPhone: dbOrder.customer_phone,
     deliveryAddress: dbOrder.delivery_address,
     paymentMethod: dbOrder.payment_method,
+    notes: dbOrder.notes,
+    changeFor: dbOrder.change_for ? Number(dbOrder.change_for) : undefined,
     waitstaffName: dbOrder.waitstaff_name,
-    changeFor: dbOrder.change_for,
     couponApplied: dbOrder.coupon_applied,
-    discountAmount: dbOrder.discount_amount,
+    discountAmount: dbOrder.discount_amount ? Number(dbOrder.discount_amount) : undefined,
     isSynced: true
   });
 
@@ -171,7 +175,7 @@ export default function App() {
         const [pRes, cRes, oRes, sRes] = await Promise.all([
           supabase.from('products').select('*').order('name'),
           supabase.from('categories').select('*').order('name'),
-          supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100),
+          supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(200),
           supabase.from('settings').select('data').eq('id', 'store').maybeSingle()
         ]);
 
@@ -181,7 +185,10 @@ export default function App() {
           localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(mapped));
         }
         if (cRes.data) setCategories(cRes.data.map((c: any) => c.name));
-        if (oRes.data) setOrders(oRes.data.map(mapOrderFromDb));
+        if (oRes.data) {
+          const mappedOrders = oRes.data.map(mapOrderFromDb);
+          setOrders(mappedOrders);
+        }
         if (sRes.data?.data) {
           setSettings(sRes.data.data);
           localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(sRes.data.data));
@@ -189,56 +196,33 @@ export default function App() {
         }
         initialLoadRef.current = false;
       } catch (err) {
-        console.warn('Modo offline detectado.');
+        console.warn('Modo offline ou erro de conexão detectado.');
       }
     };
     fetchData();
 
-    const channel = supabase.channel('gc-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newOrder = mapOrderFromDb(payload.new);
-          setOrders(prev => {
-            if (prev.some(o => o.id === newOrder.id)) return prev;
-            if (!initialLoadRef.current) playAudio(SOUNDS.NEW_ORDER);
-            return [newOrder, ...prev];
-          });
-        } else if (payload.eventType === 'UPDATE') {
-          const updated = mapOrderFromDb(payload.new);
-          setOrders(prev => {
-            const old = prev.find(o => o.id === updated.id);
-            if (old?.status !== 'PRONTO' && updated.status === 'PRONTO') {
-              if (!initialLoadRef.current) playAudio(SOUNDS.ORDER_READY);
-            }
-            return prev.map(o => o.id === updated.id ? updated : o);
-          });
-        }
+    // REALTIME CHANNEL - Essencial para o Admin ver os pedidos na hora
+    const channel = supabase.channel('schema-db-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        const newOrder = mapOrderFromDb(payload.new);
+        setOrders(prev => {
+          if (prev.some(o => o.id === newOrder.id)) return prev;
+          if (!initialLoadRef.current) playAudio(SOUNDS.NEW_ORDER);
+          return [newOrder, ...prev];
+        });
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const updated = mapProductFromDb(payload.new);
-          setProducts(prev => {
-            const next = prev.some(p => p.id === updated.id) 
-              ? prev.map(p => p.id === updated.id ? updated : p) 
-              : [...prev, updated];
-            localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(next));
-            return next;
-          });
-        }
-        if (payload.eventType === 'DELETE') {
-          setProducts(prev => {
-            const next = prev.filter(p => p.id !== payload.old.id);
-            localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(next));
-            return next;
-          });
-        }
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+        const updated = mapOrderFromDb(payload.new);
+        setOrders(prev => {
+          const old = prev.find(o => o.id === updated.id);
+          if (old?.status !== 'PRONTO' && updated.status === 'PRONTO') {
+            if (!initialLoadRef.current) playAudio(SOUNDS.ORDER_READY);
+          }
+          return prev.map(o => o.id === updated.id ? updated : o);
+        });
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, (payload) => {
-        if (payload.new?.data) {
-          setSettings(payload.new.data);
-          localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(payload.new.data));
-          applyColors(payload.new.data);
-        }
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, (payload) => {
+        setOrders(prev => prev.filter(o => o.id !== payload.old.id));
       })
       .subscribe();
 
@@ -246,15 +230,25 @@ export default function App() {
   }, [applyColors]);
 
   const addOrder = async (order: Order) => {
-    setOrders(prev => [order, ...prev]);
-    const { error } = await supabase.from('orders').insert([mapOrderToDb(order)]);
-    if (error) console.error("Erro ao salvar pedido:", error);
+    // Tentativa de inserção no banco
+    const dbObject = mapOrderToDb(order);
+    const { error } = await supabase.from('orders').insert([dbObject]);
+    
+    if (error) {
+      console.error("Erro Supabase ao salvar pedido:", error);
+      throw error;
+    }
+
+    // Se inseriu com sucesso, atualizamos localmente para feedback instantâneo (o Realtime também fará isso, mas aqui é mais rápido para o usuário que fez o pedido)
+    setOrders(prev => {
+      if (prev.some(o => o.id === order.id)) return prev;
+      return [order, ...prev];
+    });
   };
 
   const handleSaveProduct = async (p: Product) => {
     const { error } = await supabase.from('products').upsert([mapProductToDb(p)]);
     if (error) throw error;
-    
     setProducts(prev => {
       const next = prev.some(item => item.id === p.id) ? prev.map(item => item.id === p.id ? p : item) : [...prev, p];
       localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(next));
@@ -273,21 +267,16 @@ export default function App() {
   };
 
   const updateOrderStatus = async (id: string, status: OrderStatus) => {
-    await supabase.from('orders').update({ status }).eq('id', id);
+    const { error } = await supabase.from('orders').update({ status }).eq('id', id);
+    if (error) console.error("Erro ao atualizar status:", error);
   };
 
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
     const { error } = await supabase.from('settings').upsert({ id: 'store', data: newSettings });
     if (error) throw error;
-    
     setSettings(newSettings);
     localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(newSettings));
     applyColors(newSettings);
-  };
-
-  const handleLogoutAdmin = async () => {
-    await supabase.auth.signOut();
-    setAdminUser(null);
   };
 
   if (authLoading) return <div className="min-h-screen bg-primary flex items-center justify-center"><Loader2 className="animate-spin text-secondary" size={48} /></div>;
@@ -296,15 +285,13 @@ export default function App() {
     <HashRouter>
       <Routes>
         <Route path="/login" element={adminUser ? <Navigate to="/" /> : <LoginPage onLoginSuccess={setAdminUser} />} />
-        
-        <Route path="/" element={adminUser ? <AdminLayout settings={settings} onLogout={handleLogoutAdmin} /> : <Navigate to="/login" />}>
+        <Route path="/" element={adminUser ? <AdminLayout settings={settings} onLogout={() => supabase.auth.signOut()} /> : <Navigate to="/login" />}>
           <Route index element={<AdminDashboard orders={orders} products={products} settings={settings} />} />
           <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={handleSaveProduct} deleteProduct={handleDeleteProduct} categories={categories} setCategories={setCategories} />} />
           <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} />} />
           <Route path="equipe" element={<WaitstaffManagement settings={settings} onUpdateSettings={handleUpdateSettings} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} />} />
         </Route>
-
         <Route path="/cozinha" element={<KitchenBoard orders={orders} updateStatus={updateOrderStatus} />} />
         <Route path="/garconete" element={<WaitressPanel orders={orders} settings={settings} onSelectTable={setActiveTable} />} />
         <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!localStorage.getItem('vovo-guta-waitstaff')} />} />

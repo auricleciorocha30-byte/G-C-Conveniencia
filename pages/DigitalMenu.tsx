@@ -64,7 +64,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   
   const isStoreClosed = settings.isStoreOpen === false;
 
-  // Gerenciamento da Seleção de Modalidade (Abertura Dinâmica)
   const [hasSelectedMode, setHasSelectedMode] = useState(() => {
     if (isWaitstaff) return true;
     if (effectiveTable && settings.isTableOrderActive) return true;
@@ -89,7 +88,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   
-  const [lastOrderDetails, setLastOrderDetails] = useState<{total: number, changeFor?: number} | null>(null);
   const [activeWaitstaff, setActiveWaitstaff] = useState<Waitstaff | null>(null);
 
   useEffect(() => {
@@ -215,17 +213,20 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     if (orderType === 'MESA' && !manualTable) { alert('Informe o número da mesa.'); return; }
-    if (orderType === 'BALCAO' && !customerName) { alert('Informe o nome do cliente.'); return; }
+    if (orderType === 'BALCAO' && !customerName) { alert('Informe o seu nome.'); return; }
     if (orderType === 'ENTREGA' && (!customerName || !customerPhone || !deliveryAddress)) { 
       alert('Preencha os dados de entrega.'); 
       return; 
     }
 
     setIsSending(true);
-    const orderChangeFor = (payment === 'DINHEIRO' && changeFor) ? parseFloat(changeFor) : undefined;
+    const orderChangeFor = (payment === 'DINHEIRO' && changeFor) ? parseFloat(changeFor.replace(',', '.')) : undefined;
     
+    // Gera um ID aleatório para o pedido localmente antes da sincronização
+    const randomId = Math.random().toString(36).substr(2, 5).toUpperCase();
+
     const finalOrder: Order = {
-      id: Math.random().toString(36).substr(2, 5).toUpperCase(),
+      id: randomId,
       type: orderType, 
       items: cart, 
       status: 'PREPARANDO', 
@@ -245,12 +246,11 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
     try { 
       await addOrder(finalOrder); 
-      setLastOrderDetails({ total: cartTotal, changeFor: orderChangeFor });
       setCart([]); 
       setAppliedCoupon(null);
       setCheckoutStep('success'); 
     } catch (err: any) { 
-      alert(`Erro ao enviar pedido: ${err.message}`); 
+      alert(`Erro ao enviar pedido para o sistema: ${err.message}`); 
     } finally { 
       setIsSending(false); 
     }
@@ -273,7 +273,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     setHasSelectedMode(true);
   };
 
-  // TELA DE ABERTURA DINÂMICA
   if (!hasSelectedMode && !isWaitstaff) {
     return (
       <div className="min-h-screen bg-primary flex items-center justify-center p-6 text-zinc-900">
@@ -337,13 +336,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                       </div>
                       <ArrowRight className="text-green-200 group-hover:text-green-400 group-hover:translate-x-1 transition-all" size={20} />
                   </button>
-                )}
-                
-                {/* Fallback se nada estiver ativo */}
-                {!settings.isTableOrderActive && !settings.isCounterPickupActive && !settings.isDeliveryActive && (
-                  <div className="text-center p-6 bg-gray-50 rounded-3xl text-gray-400 italic text-sm border border-dashed border-gray-200">
-                    Nenhum canal de pedido disponível.
-                  </div>
                 )}
             </div>
           )}
@@ -461,95 +453,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       </main>
 
-      {isInfoOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl animate-scale-up">
-            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-              <div className="flex items-center gap-2">
-                <Store size={20} className="text-primary" />
-                <h2 className="font-bold text-primary">Informações da Loja</h2>
-              </div>
-              <button onClick={() => setIsInfoOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
-            </div>
-            <div className="p-8 space-y-6">
-              <div className="text-center">
-                 <img src={settings.logoUrl} className="w-20 h-20 rounded-full mx-auto border-4 border-orange-50 object-cover shadow-md mb-3" alt="Logo" />
-                 <h3 className="text-xl font-brand font-bold text-primary">{settings.storeName}</h3>
-              </div>
-              
-              <div className="space-y-4">
-                {settings.whatsapp && (
-                  <button onClick={handleWhatsApp} className="w-full flex items-center gap-4 p-4 bg-green-50 rounded-2xl border border-green-100 group hover:bg-green-100 transition-colors">
-                    <div className="p-3 bg-white rounded-xl text-green-600 shadow-sm"><MessageCircle size={24} /></div>
-                    <div className="text-left">
-                      <p className="text-[10px] font-black uppercase text-green-700 opacity-60">WhatsApp</p>
-                      <p className="font-bold text-green-800">Falar Conosco</p>
-                    </div>
-                  </button>
-                )}
-
-                {settings.address && (
-                  <div className="p-5 bg-orange-50 rounded-2xl border border-orange-100 space-y-3">
-                    <div className="flex items-center gap-3">
-                      <MapPin size={20} className="text-orange-600 shrink-0" />
-                      <p className="text-xs text-orange-900 font-medium leading-relaxed">{settings.address}</p>
-                    </div>
-                    <button onClick={handleOpenMap} className="w-full py-3 bg-primary text-white rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
-                      <Navigation size={14} /> Ver no Mapa
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {weightProduct && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-[300px] rounded-[2rem] p-6 shadow-2xl animate-scale-up space-y-5">
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mx-auto border-2 border-orange-100">
-                <Scale size={28} />
-              </div>
-              <h2 className="text-lg font-bold text-primary truncate leading-tight">{weightProduct.name}</h2>
-              <p className="text-[9px] text-gray-400 uppercase font-black tracking-widest">Peso em Gramas (g)</p>
-            </div>
-            <div className="space-y-3">
-              <div className="relative">
-                <input 
-                  autoFocus
-                  type="text" 
-                  inputMode="decimal"
-                  placeholder="0" 
-                  value={selectedWeightGrams} 
-                  onChange={e => setSelectedWeightGrams(e.target.value)}
-                  className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none font-black text-3xl text-center focus:border-secondary transition-colors" 
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 font-bold">g</span>
-              </div>
-              {selectedWeightGrams && (
-                <div className="bg-orange-50 p-2.5 rounded-xl text-center border border-orange-100">
-                    <span className="text-secondary font-black text-lg">
-                      R$ {((weightProduct.price * (parseFloat(selectedWeightGrams.replace(',', '.')) || 0)) / 1000).toFixed(2)}
-                    </span>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button onClick={() => setWeightProduct(null)} className="flex-1 py-3 text-gray-400 font-bold uppercase text-[10px]">Cancelar</button>
-              <button 
-                onClick={confirmWeightAddition}
-                disabled={!selectedWeightGrams}
-                className="flex-[2] py-3 bg-primary text-white rounded-xl font-bold shadow-xl active:scale-95 disabled:opacity-30 text-xs"
-              >
-                CONFIRMAR
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isCartOpen && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center">
           <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl animate-slide-up">
@@ -588,36 +491,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                       ))
                     )}
                   </div>
-
-                  {cart.length > 0 && settings.isCouponActive && (
-                    <div className="p-4 bg-orange-50 rounded-[1.5rem] border border-orange-100 space-y-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Ticket size={16} className="text-secondary" />
-                        <span className="text-[10px] font-black uppercase text-orange-700 tracking-widest">Tem um cupom?</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          placeholder="Código do cupom" 
-                          value={couponCode}
-                          onChange={e => setCouponCode(e.target.value)}
-                          className="flex-1 px-4 py-2 bg-white rounded-xl border border-orange-200 outline-none text-xs font-bold focus:ring-2 focus:ring-orange-300"
-                        />
-                        <button 
-                          onClick={handleApplyCoupon}
-                          className="px-4 py-2 bg-secondary text-white rounded-xl text-[10px] font-bold shadow-md active:scale-95"
-                        >
-                          APLICAR
-                        </button>
-                      </div>
-                      {appliedCoupon && (
-                        <div className="flex items-center justify-between text-[10px] font-bold text-green-600 bg-white/50 px-3 py-1.5 rounded-lg border border-green-100">
-                           <span>Cupom "{appliedCoupon.code}" aplicado!</span>
-                           <span>-{appliedCoupon.discount}%</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
 
