@@ -145,19 +145,19 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings }) => {
 
       {/* NOVO: Atalhos Operacionais para Mobile/Desktop */}
       <section className="space-y-3">
-        <h2 className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Atalhos da Operação</h2>
+        <h2 className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Atalhos da Equipe (Nova Guia)</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <OpPanelLink 
-            to="#/cozinha" 
-            label="Painel Cozinha" 
-            icon={<ChefHat size={24} />} 
-            color="bg-blue-50 text-blue-600 border-blue-100" 
-          />
           <OpPanelLink 
             to="#/atendimento" 
             label="Painel Atendente" 
             icon={<UserRound size={24} />} 
             color="bg-orange-50 text-orange-600 border-orange-100" 
+          />
+          <OpPanelLink 
+            to="#/cozinha" 
+            label="Painel Cozinha" 
+            icon={<ChefHat size={24} />} 
+            color="bg-blue-50 text-blue-600 border-blue-100" 
           />
           <OpPanelLink 
             to="#/tv" 
@@ -324,7 +324,7 @@ const OpPanelLink = ({ to, label, icon, color }: { to: string, label: string, ic
     <div className="p-3 bg-white rounded-xl shadow-sm">{icon}</div>
     <div>
       <p className="font-bold text-sm leading-none">{label}</p>
-      <p className="text-[10px] font-bold opacity-60 uppercase mt-1 tracking-widest">Abrir Painel</p>
+      <p className="text-[10px] font-bold opacity-60 uppercase mt-1 tracking-widest">Abrir em Nova Guia</p>
     </div>
   </a>
 );
