@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   ShoppingCart, 
   X, 
@@ -42,8 +42,9 @@ interface Props {
   isWaitstaff?: boolean;
 }
 
-const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories, settings, addOrder, tableNumber: initialTable, onLogout, onCloseMenu, isWaitstaff = false }) => {
+const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories, settings, addOrder, tableNumber: initialTable, onLogout, onCloseMenu, isWaitstaff: initialIsWaitstaff = false }) => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const urlTable = searchParams.get('mesa');
   const urlType = searchParams.get('tipo');
   
@@ -63,6 +64,8 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const effectiveTable = initialTable || urlTable || null;
   
   const isStoreClosed = settings.isStoreOpen === false;
+
+  const [isWaitstaff, setIsWaitstaff] = useState(initialIsWaitstaff || !!localStorage.getItem('vovo-guta-waitstaff'));
 
   const [hasSelectedMode, setHasSelectedMode] = useState(() => {
     if (isWaitstaff) return true;
@@ -92,7 +95,11 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
   useEffect(() => {
     const saved = localStorage.getItem('vovo-guta-waitstaff');
-    if (saved) setActiveWaitstaff(JSON.parse(saved));
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        setActiveWaitstaff(parsed);
+        setIsWaitstaff(true);
+    }
   }, []);
 
   const categories = useMemo(() => ['Todos', ...externalCategories], [externalCategories]);
@@ -110,6 +117,20 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       return matchesCategory && matchesSearch;
     });
   }, [products, activeCategory, searchTerm]);
+
+  const handleBack = () => {
+    if (onCloseMenu) {
+      onCloseMenu();
+      return;
+    }
+    
+    if (isWaitstaff) {
+      navigate('/atendimento');
+      return;
+    }
+    
+    setHasSelectedMode(false);
+  };
 
   const handleAddToCart = (product: Product) => {
     if (!product.isActive) return;
@@ -221,8 +242,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
     setIsSending(true);
     const orderChangeFor = (payment === 'DINHEIRO' && changeFor) ? parseFloat(changeFor.replace(',', '.')) : undefined;
-    
-    // Geramos um ID numérico baseado no timestamp para garantir que o banco aceite (coluna bigint)
     const timestampId = Date.now().toString();
 
     const finalOrder: Order = {
@@ -254,18 +273,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     } finally { 
       setIsSending(false); 
     }
-  };
-
-  const handleOpenMap = () => {
-    if (!settings.address) return;
-    const encodedAddress = encodeURIComponent(settings.address);
-    window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
-  };
-
-  const handleWhatsApp = () => {
-    if (!settings.whatsapp) return;
-    const number = settings.whatsapp.replace(/\D/g, '');
-    window.open(`https://wa.me/${number}`, '_blank');
   };
 
   const selectMode = (type: OrderType) => {
@@ -349,7 +356,9 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       <header className={`sticky top-0 z-30 shadow-md ${isWaitstaff ? 'bg-secondary' : 'bg-primary'} text-white p-3 md:p-4 transition-all w-full`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <button onClick={() => isWaitstaff ? (onCloseMenu ? onCloseMenu() : window.location.hash = '/garconete') : setHasSelectedMode(false)} className="p-2 hover:bg-white/10 rounded-full shrink-0"><ChevronLeft size={22} /></button>
+            <button onClick={handleBack} className="p-2 hover:bg-white/10 rounded-full shrink-0">
+                <ChevronLeft size={22} />
+            </button>
             <div className="flex flex-col min-w-0">
                 <h1 className="font-brand text-sm md:text-base font-bold leading-none truncate">{settings.storeName}</h1>
                 <span className="text-[9px] uppercase font-black opacity-70 truncate mt-0.5">
@@ -453,7 +462,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       </main>
 
-      {/* NOVO: Modal de Seleção de Peso */}
+      {/* Modal de Seleção de Peso */}
       {weightProduct && (
         <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl animate-scale-up overflow-hidden border border-orange-100">
@@ -600,7 +609,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                       <h2 className="text-2xl font-bold text-primary">Pedido Enviado!</h2>
                       <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-2 leading-relaxed">Já estamos cuidando da sua <br/> delícia por aqui.</p>
                     </div>
-                    <button onClick={() => { setIsCartOpen(false); setCheckoutStep('cart'); if(isWaitstaff && onCloseMenu) onCloseMenu(); }} className="w-full py-4.5 text-white bg-primary rounded-2xl font-bold shadow-xl active:scale-95 transition-transform text-xs uppercase tracking-widest">Concluído</button>
+                    <button onClick={() => { setIsCartOpen(false); setCheckoutStep('cart'); if(onCloseMenu) onCloseMenu(); }} className="w-full py-4.5 text-white bg-primary rounded-2xl font-bold shadow-xl active:scale-95 transition-transform text-xs uppercase tracking-widest">Concluído</button>
                 </div>
               )}
             </div>
