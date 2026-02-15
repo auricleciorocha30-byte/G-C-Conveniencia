@@ -122,14 +122,33 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings, upda
 
   const handlePrintConferencia = (tableNum: string) => {
     const tableOrders = activeOrders.filter(o => o.tableNumber === tableNum);
-    const combinedItems = tableOrders.flatMap(o => o.items);
-    const total = tableOrders.reduce((acc, o) => acc + o.total, 0);
+    const combinedItems: any[] = [];
+    
+    // Agrupar itens repetidos para a conferência
+    tableOrders.forEach(order => {
+      order.items.forEach(item => {
+        const existing = combinedItems.find(i => i.productId === item.productId);
+        if (existing) {
+          existing.quantity += item.quantity;
+        } else {
+          combinedItems.push({ ...item });
+        }
+      });
+    });
+
+    const subtotal = combinedItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+    const totalDiscount = tableOrders.reduce((acc, o) => acc + (o.discountAmount || 0), 0);
+    const finalTotal = subtotal - totalDiscount;
     
     setPrintOrder({
+      id: `CONF-${tableNum}`,
       tableNumber: tableNum,
       items: combinedItems,
-      total: total,
-      createdAt: Date.now()
+      total: finalTotal,
+      subtotal: subtotal,
+      discountAmount: totalDiscount,
+      createdAt: Date.now(),
+      isConferencia: true
     });
     
     setTimeout(() => { 
@@ -162,12 +181,21 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings, upda
     <div className="min-h-screen bg-primary p-4 md:p-8 relative overflow-x-hidden">
       <style>{`
         @media print {
+          @page { margin: 0; }
+          html, body { margin: 0; padding: 0; background: #fff !important; }
           body * { visibility: hidden; }
           #thermal-receipt-waiter, #thermal-receipt-waiter * { visibility: visible; }
           #thermal-receipt-waiter { 
-            display: block !important; position: absolute; left: 0; top: 0; 
-            width: ${settings.thermalPrinterWidth || '80mm'}; padding: 5mm; 
-            background: #fff; font-family: 'Courier New', monospace; font-size: 10pt; color: #000;
+            display: block !important; 
+            position: absolute; 
+            left: 0; 
+            top: 0; 
+            width: ${settings.thermalPrinterWidth || '80mm'}; 
+            padding: 5mm; 
+            background: #fff; 
+            font-family: 'Courier New', monospace; 
+            font-size: 10pt; 
+            color: #000;
           }
         }
       `}</style>
@@ -388,28 +416,73 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings, upda
 
       {printOrder && (
         <div id="thermal-receipt-waiter">
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ fontWeight: 'bold', fontSize: '12pt' }}>{settings.storeName.toUpperCase()}</p>
-            <p style={{ fontSize: '8pt', margin: '1mm 0' }}>CONFERÊNCIA DE MESA</p>
-            <p style={{ fontSize: '7pt' }}>{new Date().toLocaleString()}</p>
+          <div style={{ textAlign: 'center', marginBottom: '4mm' }}>
+              <p style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: '1mm' }}>{settings.storeName.toUpperCase()}</p>
+              {settings.address && <p style={{ fontSize: '7pt', lineHeight: '1.2', margin: '1mm 0' }}>{settings.address}</p>}
+              {settings.whatsapp && <p style={{ fontSize: '7pt' }}>WhatsApp: {settings.whatsapp}</p>}
+              <div style={{ borderTop: '1px solid #000', margin: '3mm 0' }}></div>
+              <p style={{ fontSize: '7pt' }}>{printOrder.isConferencia ? 'CONFERÊNCIA DE MESA' : 'PEDIDO DE VENDA'}</p>
+              <p style={{ fontSize: '7pt' }}>EMISSÃO: {new Date().toLocaleString('pt-BR')}</p>
           </div>
-          <div style={{ borderTop: '1px solid #000', margin: '3mm 0' }}></div>
-          <p style={{ fontWeight: 'bold', fontSize: '11pt', textAlign: 'center' }}>{printOrder.tableNumber ? `MESA: ${printOrder.tableNumber}` : `PEDIDO: #${printOrder.id?.slice(-4)}`}</p>
-          <table style={{ width: '100%', marginTop: '3mm', borderCollapse: 'collapse' }}>
-            <tbody>
-              {printOrder.items.map((it: any, i: number) => (
-                <tr key={i} style={{ borderBottom: '1px dashed #eee' }}>
-                  <td style={{ fontSize: '9pt', padding: '1mm 0' }}>{it.quantity}x {it.name.toUpperCase()}</td>
-                  <td style={{ textAlign: 'right', fontSize: '9pt' }}>{(it.price * it.quantity).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div style={{ borderTop: '1px solid #000', marginTop: '3mm', textAlign: 'right', paddingTop: '2mm' }}>
-            <p style={{ fontWeight: 'bold', fontSize: '11pt' }}>TOTAL: R$ {printOrder.total.toFixed(2)}</p>
+          
+          <div style={{ paddingBottom: '2mm' }}>
+              <p style={{ fontWeight: 'bold', fontSize: '10pt', textAlign: 'center', marginBottom: '2mm' }}>
+                {printOrder.tableNumber ? `MESA: ${printOrder.tableNumber}` : `PEDIDO: #${printOrder.id?.slice(-4)}`}
+              </p>
+              <p style={{ fontSize: '9pt' }}>ATENDENTE: {activeWaitstaff?.name.toUpperCase() || 'SISTEMA'}</p>
+              <p style={{ fontSize: '9pt' }}>CLIENTE: {printOrder.customerName?.toUpperCase() || 'BALCÃO'}</p>
+              {printOrder.customerPhone && <p style={{ fontSize: '9pt' }}>TEL: {printOrder.customerPhone}</p>}
+              
+              {printOrder.deliveryAddress && (
+                <div style={{ marginTop: '2mm', padding: '2mm', background: '#f0f0f0', border: '1px solid #000' }}>
+                    <p style={{ fontSize: '8pt', fontWeight: 'bold' }}>ENTREGA EM:</p>
+                    <p style={{ fontSize: '8pt' }}>{printOrder.deliveryAddress.toUpperCase()}</p>
+                </div>
+              )}
           </div>
-          <div style={{ marginTop: '5mm', textAlign: 'center', fontSize: '7pt' }}>
-            <p>ESTE DOCUMENTO NÃO É UM CUPOM FISCAL</p>
+
+          <div style={{ borderTop: '1px dashed #000', padding: '2mm 0' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tbody>
+                  {printOrder.items.map((it: any, i: number) => (
+                    <tr key={i}>
+                      <td style={{ fontSize: '9pt', padding: '1.5mm 0' }}>
+                        {it.isByWeight ? `${it.quantity.toFixed(3)}kg` : `${it.quantity}x`} {it.name.toUpperCase()}
+                      </td>
+                      <td style={{ textAlign: 'right', fontSize: '9pt' }}>{(it.price * it.quantity).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+          </div>
+
+          {printOrder.notes && (
+            <div style={{ borderTop: '1px dashed #000', padding: '2mm 0' }}>
+               <p style={{ fontSize: '8pt', fontWeight: 'bold' }}>OBSERVAÇÕES:</p>
+               <p style={{ fontSize: '8pt', fontStyle: 'italic' }}>- {printOrder.notes}</p>
+            </div>
+          )}
+
+          <div style={{ borderTop: '1px solid #000', padding: '3mm 0', textAlign: 'right' }}>
+              <p style={{ fontSize: '9pt' }}>SUBTOTAL: R$ {(printOrder.subtotal || (printOrder.total + (printOrder.discountAmount || 0))).toFixed(2)}</p>
+              {printOrder.discountAmount && printOrder.discountAmount > 0 && (
+                <p style={{ fontSize: '9pt', color: '#000' }}>DESCONTO: -R$ {printOrder.discountAmount.toFixed(2)}</p>
+              )}
+              <p style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: '1mm' }}>TOTAL: R$ {printOrder.total.toFixed(2)}</p>
+              <p style={{ fontSize: '8pt', marginTop: '1mm' }}>PAGAMENTO: {printOrder.paymentMethod || (printOrder.isConferencia ? 'A CONFERIR' : 'A DEFINIR')}</p>
+              
+              {printOrder.changeFor && printOrder.changeFor > 0 && (
+                <div style={{ marginTop: '2mm' }}>
+                    <p style={{ fontSize: '9pt' }}>PAGO EM DINHEIRO: R$ {printOrder.changeFor.toFixed(2)}</p>
+                    <p style={{ fontSize: '10pt', fontWeight: 'bold' }}>TROCO: R$ {(printOrder.changeFor - printOrder.total).toFixed(2)}</p>
+                </div>
+              )}
+          </div>
+          
+          <div style={{ borderTop: '1px dashed #000', marginTop: '4mm', paddingTop: '4mm', textAlign: 'center' }}>
+              <p style={{ fontSize: '8pt' }}>OBRIGADO PELA PREFERÊNCIA!</p>
+              <p style={{ fontSize: '6pt' }}>SISTEMA G & C CONVENIÊNCIA</p>
+              {printOrder.isConferencia && <p style={{ fontSize: '7pt', fontWeight: 'bold', marginTop: '2mm' }}>ESTE DOCUMENTO NÃO É UM CUPOM FISCAL</p>}
           </div>
         </div>
       )}
