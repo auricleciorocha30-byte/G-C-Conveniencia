@@ -5,10 +5,10 @@ import { ChefHat, Clock, Utensils, ShoppingBag, Truck, CheckCircle, Hash, Dollar
 
 interface Props {
   orders: Order[];
-  updateStatus: (id: string, status: OrderStatus) => Promise<void>;
+  updateOrder: (id: string, updates: Partial<Order>) => Promise<void>;
 }
 
-const KitchenBoard: React.FC<Props> = ({ orders, updateStatus }) => {
+const KitchenBoard: React.FC<Props> = ({ orders, updateOrder }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -17,7 +17,7 @@ const KitchenBoard: React.FC<Props> = ({ orders, updateStatus }) => {
   }, []);
 
   const activeOrders = useMemo(() => {
-    return orders.filter(o => o.status === 'PREPARANDO');
+    return orders.filter(o => o.status === 'PREPARANDO' && o.sendToKitchen === true);
   }, [orders]);
 
   const columns = useMemo(() => {
@@ -30,7 +30,7 @@ const KitchenBoard: React.FC<Props> = ({ orders, updateStatus }) => {
 
   const handleMarkReady = async (id: string) => {
     try {
-      await updateStatus(id, 'PRONTO');
+      await updateOrder(id, { status: 'PRONTO' });
     } catch (err) {
       alert('Erro ao atualizar status do pedido.');
     }

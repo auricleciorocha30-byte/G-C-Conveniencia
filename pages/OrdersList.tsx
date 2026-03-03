@@ -5,7 +5,7 @@ import { Clock, Printer, UserRound, CheckCircle2, DollarSign, AlertCircle, MapPi
 
 interface Props {
   orders: Order[];
-  updateStatus: (id: string, status: OrderStatus) => void;
+  updateOrder: (id: string, updates: Partial<Order>) => void;
   products: Product[];
   addOrder: (order: Order) => void;
   settings: StoreSettings;
@@ -31,7 +31,7 @@ interface GroupedOrder {
   discountAmount?: number;
 }
 
-const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder, settings }) => {
+const OrdersList: React.FC<Props> = ({ orders, updateOrder, products, addOrder, settings }) => {
   const [filterType, setFilterType] = useState<'TODOS' | OrderType>('TODOS');
   const [printOrder, setPrintOrder] = useState<GroupedOrder | null>(null);
 
@@ -98,7 +98,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
   };
 
   const handleStatusUpdate = async (group: GroupedOrder, newStatus: OrderStatus) => {
-    await Promise.all(group.originalOrderIds.map(id => updateStatus(id, newStatus)));
+    await Promise.all(group.originalOrderIds.map(id => updateOrder(id, { status: newStatus })));
   };
 
   const getPaymentIcon = (method?: string) => {

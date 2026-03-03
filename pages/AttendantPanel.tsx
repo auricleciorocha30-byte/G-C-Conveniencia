@@ -16,7 +16,8 @@ import {
   Truck,
   Loader2,
   RefreshCw,
-  Lock
+  Lock,
+  ChefHat
 } from 'lucide-react';
 import { Order, OrderStatus, Waitstaff, StoreSettings } from '../types';
 import { supabase } from '../lib/supabase';
@@ -25,10 +26,10 @@ interface Props {
   onSelectTable: (table: string | null) => void;
   orders: Order[];
   settings: StoreSettings;
-  updateStatus: (id: string, status: OrderStatus) => Promise<void>;
+  updateOrder: (id: string, updates: Partial<Order>) => Promise<void>;
 }
 
-const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings, updateStatus }) => {
+const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings, updateOrder }) => {
   const navigate = useNavigate();
   const [activeWaitstaff, setActiveWaitstaff] = useState<Waitstaff | null>(null);
   const [showLogin, setShowLogin] = useState(false);
@@ -161,7 +162,7 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings, upda
     const tableOrders = activeOrders.filter(o => o.tableNumber === tableNum);
     setIsUpdating(`table-${tableNum}`);
     try {
-        await Promise.all(tableOrders.map(o => updateStatus(o.id, status)));
+        await Promise.all(tableOrders.map(o => updateOrder(o.id, { status })));
         setSelectedTableModal(null);
     } finally {
         setIsUpdating(null);
@@ -171,7 +172,16 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings, upda
   const handleIndividualStatusUpdate = async (id: string, status: OrderStatus) => {
     setIsUpdating(id);
     try {
-        await updateStatus(id, status);
+        await updateOrder(id, { status });
+    } finally {
+        setIsUpdating(null);
+    }
+  };
+
+  const toggleKitchen = async (id: string, currentStatus: boolean | undefined) => {
+    setIsUpdating(id);
+    try {
+        await updateOrder(id, { sendToKitchen: !currentStatus });
     } finally {
         setIsUpdating(null);
     }
@@ -283,9 +293,18 @@ const AttendantPanel: React.FC<Props> = ({ onSelectTable, orders, settings, upda
                         {order.customerName || `Pedido #${order.id.slice(-4)}`}
                     </h3>
                   </div>
-                  <button onClick={() => { setPrintOrder(order); setTimeout(() => window.print(), 300); }} className="p-2.5 bg-gray-50 text-gray-400 rounded-xl hover:text-secondary hover:bg-gray-100 transition-all">
-                    <Printer size={20} />
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => toggleKitchen(order.id, order.sendToKitchen)} 
+                      className={`p-2.5 rounded-xl transition-all ${order.sendToKitchen ? 'bg-green-100 text-green-600 shadow-sm' : 'bg-gray-50 text-gray-400 hover:text-secondary hover:bg-gray-100'}`}
+                      title={order.sendToKitchen ? "Remover da Cozinha" : "Enviar para Cozinha"}
+                    >
+                      <ChefHat size={20} />
+                    </button>
+                    <button onClick={() => { setPrintOrder(order); setTimeout(() => window.print(), 300); }} className="p-2.5 bg-gray-50 text-gray-400 rounded-xl hover:text-secondary hover:bg-gray-100 transition-all">
+                      <Printer size={20} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex-1 space-y-2 mb-5 border-t border-gray-50 pt-4 min-h-[100px] overflow-y-auto custom-scrollbar">

@@ -49,6 +49,7 @@ export interface Order {
   couponApplied?: string;
   discountAmount?: number;
   isSynced?: boolean; // Nova flag para controle offline
+  sendToKitchen?: boolean;
 }
 
 export interface StoreSettings {

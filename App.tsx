@@ -117,7 +117,8 @@ export default function App() {
     waitstaffName: dbOrder.waitstaff_name,
     couponApplied: dbOrder.coupon_applied,
     discountAmount: dbOrder.discount_amount ? Number(dbOrder.discount_amount) : undefined,
-    isSynced: true
+    isSynced: true,
+    sendToKitchen: dbOrder.send_to_kitchen
   });
 
   const mapOrderToDb = (order: Order) => {
@@ -139,7 +140,8 @@ export default function App() {
       waitstaff_name: order.waitstaffName,
       change_for: order.changeFor,
       coupon_applied: order.couponApplied,
-      discount_amount: order.discountAmount
+      discount_amount: order.discountAmount,
+      send_to_kitchen: order.sendToKitchen
     };
   };
 
@@ -268,14 +270,17 @@ export default function App() {
     });
   };
 
-  const updateOrderStatus = async (id: string, status: OrderStatus) => {
+  const updateOrder = async (id: string, updates: Partial<Order>) => {
     // Atualização otimista no estado local
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
     
-    const { error } = await supabase.from('orders').update({ status }).eq('id', id);
+    const dbUpdates: any = {};
+    if (updates.status) dbUpdates.status = updates.status;
+    if (updates.sendToKitchen !== undefined) dbUpdates.send_to_kitchen = updates.sendToKitchen;
+    
+    const { error } = await supabase.from('orders').update(dbUpdates).eq('id', id);
     if (error) {
-        console.error("Erro ao atualizar status:", error);
-        // Se falhar, poderíamos reverter, mas o Realtime deve corrigir
+        console.error("Erro ao atualizar pedido:", error);
     }
   };
 
@@ -296,12 +301,12 @@ export default function App() {
         <Route path="/" element={adminUser ? <AdminLayout settings={settings} onLogout={() => supabase.auth.signOut()} /> : <Navigate to="/login" />}>
           <Route index element={<AdminDashboard orders={orders} products={products} settings={settings} />} />
           <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={handleSaveProduct} deleteProduct={handleDeleteProduct} categories={categories} setCategories={setCategories} />} />
-          <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} />} />
+          <Route path="pedidos" element={<OrdersList orders={orders} updateOrder={updateOrder} products={products} addOrder={addOrder} settings={settings} />} />
           <Route path="equipe" element={<WaitstaffManagement settings={settings} onUpdateSettings={handleUpdateSettings} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} />} />
         </Route>
-        <Route path="/atendimento" element={<AttendantPanel orders={orders} settings={settings} onSelectTable={setActiveTable} updateStatus={updateOrderStatus} />} />
-        <Route path="/cozinha" element={<KitchenBoard orders={orders} updateStatus={updateOrderStatus} />} />
+        <Route path="/atendimento" element={<AttendantPanel orders={orders} settings={settings} onSelectTable={setActiveTable} updateOrder={updateOrder} />} />
+        <Route path="/cozinha" element={<KitchenBoard orders={orders} updateOrder={updateOrder} />} />
         <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!localStorage.getItem('vovo-guta-waitstaff')} />} />
         <Route path="/tv" element={<TVBoard orders={orders} settings={settings} products={products} />} />
         <Route path="*" element={<Navigate to="/cardapio" />} />

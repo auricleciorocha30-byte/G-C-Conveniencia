@@ -272,7 +272,8 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       deliveryAddress: orderType === 'ENTREGA' ? deliveryAddress.trim() : undefined,
       waitstaffName: activeWaitstaff?.name || undefined,
       couponApplied: appliedCoupon?.code || undefined,
-      discountAmount: discountAmount || undefined
+      discountAmount: discountAmount || undefined,
+      sendToKitchen: isWaitstaff ? true : undefined
     };
 
     try { 
