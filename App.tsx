@@ -86,19 +86,26 @@ export default function App() {
     imageUrl: p.image_url || '',
     isActive: p.is_active ?? true,
     featuredDay: p.featured_day === null ? undefined : p.featured_day,
-    isByWeight: p.is_by_weight ?? false
+    isByWeight: p.is_by_weight ?? false,
+    code: p.code || undefined
   });
 
-  const mapProductToDb = (p: Product) => ({
-    name: p.name,
-    description: p.description,
-    price: p.price,
-    category: p.category,
-    image_url: p.imageUrl,
-    is_active: p.isActive,
-    featured_day: p.featuredDay === undefined || p.featuredDay === -1 ? null : p.featuredDay,
-    is_by_weight: p.isByWeight
-  });
+  const mapProductToDb = (p: Product) => {
+    const data: any = {
+      name: p.name,
+      description: p.description,
+      price: p.price,
+      category: p.category,
+      image_url: p.imageUrl,
+      is_active: p.isActive,
+      featured_day: p.featuredDay === undefined || p.featuredDay === -1 ? null : p.featuredDay,
+      is_by_weight: p.isByWeight
+    };
+    if (p.code !== undefined) {
+      data.code = p.code || null;
+    }
+    return data;
+  };
 
   const mapOrderFromDb = (dbOrder: any): Order => ({
     id: dbOrder.id.toString(),

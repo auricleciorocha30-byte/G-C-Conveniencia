@@ -20,6 +20,7 @@ export interface Product {
   isActive: boolean;
   featuredDay?: number;
   isByWeight?: boolean;
+  code?: string;
 }
 
 export interface OrderItem {

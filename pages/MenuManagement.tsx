@@ -22,7 +22,10 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
 
-  const filtered = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filtered = products.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (p.code && p.code.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +42,8 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             imageUrl: editingProduct.imageUrl || 'https://picsum.photos/400/300',
             isActive: editingProduct.isActive !== false,
             featuredDay: (editingProduct.featuredDay === -1 || editingProduct.featuredDay === undefined) ? undefined : Number(editingProduct.featuredDay),
-            isByWeight: !!editingProduct.isByWeight
+            isByWeight: !!editingProduct.isByWeight,
+            code: editingProduct.code || undefined
         };
 
         await saveProduct(productData);
@@ -162,7 +166,8 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   {product.featuredDay !== null && product.featuredDay !== undefined && product.featuredDay !== -1 && <Star size={14} className="text-yellow-500 fill-current" />}
               </div>
               <h3 className="font-bold text-sm text-gray-800 mt-2">{product.name}</h3>
-              <p className="text-xs text-gray-400 line-clamp-1 mb-1">{product.description}</p>
+              {product.code && <p className="text-[10px] text-gray-400 font-mono mt-0.5">Cód: {product.code}</p>}
+              <p className="text-xs text-gray-400 line-clamp-1 mb-1 mt-1">{product.description}</p>
               <p className="text-sm font-bold text-[#3d251e]">R$ {product.price.toFixed(2)} {product.isByWeight ? '/ KG' : ''}</p>
             </div>
           </div>
@@ -244,7 +249,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               </div>
 
               <div className="flex gap-4 items-center">
-                <div className="w-24 h-24 bg-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 cursor-pointer overflow-hidden relative">
+                <div className="w-24 h-24 bg-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 cursor-pointer overflow-hidden relative shrink-0">
                   {editingProduct?.imageUrl ? ( <img src={editingProduct.imageUrl} className="w-full h-full object-cover" alt="Preview" /> ) : ( <> <Camera size={24} /> <span className="text-[10px]">Foto</span> </> )}
                   <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={(e) => {
                        const file = e.target.files?.[0];
@@ -255,9 +260,15 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                        }
                   }} />
                 </div>
-                <div className="flex-1">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome do Produto *</label>
-                    <input required type="text" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
+                <div className="flex-1 space-y-3">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome do Produto *</label>
+                        <input required type="text" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Código (Opcional)</label>
+                        <input type="text" value={editingProduct?.code || ''} onChange={(e) => setEditingProduct({...editingProduct, code: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" placeholder="Ex: 7891234567890" />
+                    </div>
                 </div>
               </div>
               

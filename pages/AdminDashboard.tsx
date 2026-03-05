@@ -31,19 +31,27 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings }) => {
   
   // Estados para Filtros
   const now = new Date();
-  const [filterMonth, setFilterMonth] = useState<number>(now.getMonth() + 1);
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const [filterMonth, setFilterMonth] = useState<number>(currentMonth);
   const [filterDay, setFilterDay] = useState<number>(0); 
-  const [filterYear] = useState<number>(now.getFullYear());
 
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       const orderDate = new Date(order.createdAt);
-      const matchesYear = orderDate.getFullYear() === filterYear;
+      let targetYear = currentYear;
+      
+      // Se o mês atual for Janeiro e o filtro for Dezembro, o ano deve ser o anterior
+      if (currentMonth === 1 && filterMonth === 12) {
+        targetYear -= 1;
+      }
+      
+      const matchesYear = orderDate.getFullYear() === targetYear;
       const matchesMonth = (orderDate.getMonth() + 1) === filterMonth;
       const matchesDay = filterDay === 0 || orderDate.getDate() === filterDay;
       return matchesYear && matchesMonth && matchesDay;
     });
-  }, [orders, filterMonth, filterDay, filterYear]);
+  }, [orders, filterMonth, filterDay, currentYear, currentMonth]);
 
   const totalSales = useMemo(() => filteredOrders
     .filter(o => o.status !== 'CANCELADO' && o.status !== 'PREPARANDO')
@@ -89,14 +97,26 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings }) => {
     setIsPrinting(true);
     setTimeout(() => {
       window.print();
-      setIsPrinting(false);
-    }, 300);
+      setTimeout(() => {
+        setIsPrinting(false);
+      }, 500);
+    }, 500);
   };
 
   const months = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
   ];
+
+  const availableMonths = useMemo(() => {
+    const currentMonthIndex = now.getMonth();
+    const previousMonthIndex = currentMonthIndex === 0 ? 11 : currentMonthIndex - 1;
+    
+    return [
+      { value: previousMonthIndex + 1, label: months[previousMonthIndex] },
+      { value: currentMonthIndex + 1, label: months[currentMonthIndex] }
+    ];
+  }, [now.getMonth()]);
 
   const chartData = [
     { name: 'Seg', sales: 400 },
@@ -179,7 +199,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings }) => {
               onChange={(e) => setFilterMonth(Number(e.target.value))}
               className="appearance-none pl-4 pr-10 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-secondary/20 transition-all"
             >
-              {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+              {availableMonths.map((m, i) => <option key={i} value={m.value}>{m.label}</option>)}
             </select>
             <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
@@ -214,20 +234,22 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings }) => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8 bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col min-h-[400px]">
           <h2 className="text-lg font-bold text-gray-800 mb-8">Performance Semanal</h2>
-          <div className="flex-1 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9ca3af'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9ca3af'}} />
-                <Tooltip cursor={{fill: '#f9fafb'}} contentStyle={{borderRadius: '12px', border: 'none'}} />
-                <Bar dataKey="sales" radius={[8, 8, 0, 0]}>
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 5 ? 'var(--secondary-color)' : '#e5e7eb'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex-1 w-full min-h-[300px]">
+            {!isPrinting && (
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9ca3af'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9ca3af'}} />
+                  <Tooltip cursor={{fill: '#f9fafb'}} contentStyle={{borderRadius: '12px', border: 'none'}} />
+                  <Bar dataKey="sales" radius={[8, 8, 0, 0]}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 5 ? 'var(--secondary-color)' : '#e5e7eb'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -280,7 +302,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings }) => {
           <div style={{ borderBottom: '3px solid black', margin: '20px 0' }}></div>
           <h2 style={{ fontSize: '18pt', fontWeight: 'bold' }}>RELATÓRIO DE VENDAS POR PERÍODO</h2>
           <p style={{ fontSize: '12pt', marginTop: '10px' }}>
-            PERÍODO: {filterDay !== 0 ? `${filterDay}/` : ''}{filterMonth}/{filterYear}
+            PERÍODO: {filterDay !== 0 ? `${filterDay}/` : ''}{filterMonth}/{currentMonth === 1 && filterMonth === 12 ? currentYear - 1 : currentYear}
           </p>
           <p style={{ fontSize: '10pt', marginTop: '5px' }}>Gerado em: {new Date().toLocaleString('pt-BR')}</p>
         </div>

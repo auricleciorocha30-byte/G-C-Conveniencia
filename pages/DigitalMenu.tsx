@@ -116,7 +116,8 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     return products.filter(p => {
       const matchesCategory = activeCategory === 'Todos' || p.category === activeCategory;
       const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           p.description.toLowerCase().includes(searchTerm.toLowerCase());
+                           p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (p.code && p.code.toLowerCase().includes(searchTerm.toLowerCase()));
       return matchesCategory && matchesSearch;
     });
   }, [products, activeCategory, searchTerm]);
@@ -453,6 +454,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
               <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5">
                 <div className="min-w-0">
                   <h3 className="font-bold text-[11px] sm:text-[12px] md:text-sm truncate leading-tight text-zinc-900">{product.name}</h3>
+                  {product.code && <p className="text-[9px] text-gray-400 font-mono mt-0.5">Cód: {product.code}</p>}
                   <p className="text-[9px] sm:text-[10px] text-gray-400 line-clamp-1 mt-0.5">{product.description}</p>
                 </div>
                 <div className="flex items-center justify-between mt-2 gap-1.5">
