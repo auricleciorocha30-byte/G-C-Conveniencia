@@ -242,8 +242,17 @@ export default function App() {
 
   const addOrder = async (order: Order) => {
     const dbObject = mapOrderToDb(order);
-    const { data, error } = await supabase.from('orders').insert([dbObject]).select();
+    let { data, error } = await supabase.from('orders').insert([dbObject]).select();
     
+    // Fallback para caso a coluna 'send_to_kitchen' não exista no banco de dados
+    if (error && error.message && error.message.includes("'send_to_kitchen' column")) {
+      console.warn("Coluna 'send_to_kitchen' ausente no banco. Salvando sem ela.");
+      const { send_to_kitchen, ...dbObjWithoutSendToKitchen } = dbObject;
+      const retry = await supabase.from('orders').insert([dbObjWithoutSendToKitchen]).select();
+      data = retry.data;
+      error = retry.error;
+    }
+
     if (error) {
       console.error("Erro Supabase:", error);
       throw error;
@@ -257,7 +266,16 @@ export default function App() {
 
   const handleSaveProduct = async (p: Product) => {
     const dbObj = mapProductToDb(p);
-    const { error } = await supabase.from('products').upsert([{ ...dbObj, id: p.id.includes('.') ? undefined : p.id }]);
+    let { error } = await supabase.from('products').upsert([{ ...dbObj, id: p.id.includes('.') ? undefined : p.id }]);
+    
+    // Fallback para caso a coluna 'code' não exista no banco de dados
+    if (error && error.message && error.message.includes("'code' column")) {
+      console.warn("Coluna 'code' ausente no banco. Salvando sem o código.");
+      const { code, ...dbObjWithoutCode } = dbObj;
+      const retry = await supabase.from('products').upsert([{ ...dbObjWithoutCode, id: p.id.includes('.') ? undefined : p.id }]);
+      error = retry.error;
+    }
+
     if (error) throw error;
     
     setProducts(prev => {
@@ -285,7 +303,23 @@ export default function App() {
     if (updates.status) dbUpdates.status = updates.status;
     if (updates.sendToKitchen !== undefined) dbUpdates.send_to_kitchen = updates.sendToKitchen;
     
-    const { error } = await supabase.from('orders').update(dbUpdates).eq('id', id);
+    let { error } = await supabase.from('orders').update(dbUpdates).eq('id', id);
+
+    // Fallback para caso a coluna 'send_to_kitchen' não exista no banco de dados
+    if (error && error.message && error.message.includes("'send_to_kitchen' column")) {
+      console.warn("Coluna 'send_to_kitchen' ausente no banco. Atualizando sem ela.");
+      const { send_to_kitchen, ...dbUpdatesWithoutSendToKitchen } = dbUpdates;
+      
+      // Se houver outros campos para atualizar, tenta novamente
+      if (Object.keys(dbUpdatesWithoutSendToKitchen).length > 0) {
+        const retry = await supabase.from('orders').update(dbUpdatesWithoutSendToKitchen).eq('id', id);
+        error = retry.error;
+      } else {
+        // Se era o único campo, ignora o erro
+        error = null;
+      }
+    }
+
     if (error) {
         console.error("Erro ao atualizar pedido:", error);
     }
