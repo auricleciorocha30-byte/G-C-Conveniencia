@@ -29,7 +29,8 @@ import {
   ArrowRight,
   ShieldCheck,
   Tag,
-  Check
+  Check,
+  ChefHat
 } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff } from '../types';
 
@@ -95,6 +96,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const [deliveryAddress, setDeliveryAddress] = useState('');
   
   const [activeWaitstaff, setActiveWaitstaff] = useState<Waitstaff | null>(null);
+  const [sendToKitchen, setSendToKitchen] = useState(true);
 
   useEffect(() => {
     const saved = localStorage.getItem('vovo-guta-waitstaff');
@@ -274,7 +276,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       waitstaffName: activeWaitstaff?.name || undefined,
       couponApplied: appliedCoupon?.code || undefined,
       discountAmount: discountAmount || undefined,
-      sendToKitchen: isWaitstaff ? true : undefined
+      sendToKitchen: isWaitstaff ? sendToKitchen : undefined
     };
 
     try { 
@@ -712,6 +714,24 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                      <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Observações</label>
                      <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Tire a cebola, troque o molho..." className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-xs h-20 resize-none focus:ring-2 focus:ring-primary/10" />
                   </div>
+
+                  {isWaitstaff && (
+                    <div className="flex items-center justify-between p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                      <div className="flex items-center gap-3">
+                        <ChefHat className={sendToKitchen ? "text-orange-500" : "text-gray-400"} size={20} />
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">Enviar para Cozinha</p>
+                          <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-0.5">Aparecerá no painel da cozinha</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setSendToKitchen(!sendToKitchen)}
+                        className={`w-12 h-6 rounded-full transition-colors relative ${sendToKitchen ? 'bg-orange-500' : 'bg-gray-300'}`}
+                      >
+                        <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${sendToKitchen ? 'translate-x-7' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
